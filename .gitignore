@@ -1,0 +1,7 @@
+# Temp & Dist
+/temp
+/tmp
+/dist
+
+# DB Data
+/data
