@@ -23,6 +23,7 @@ type DB struct {
 	transactions      map[string]*sql.Tx
 	transactionsMutex sync.Mutex
 	writeChan         chan writeTask
+	wg                sync.WaitGroup
 }
 
 // writeTask holds the info needed to process a single write request.
@@ -108,12 +109,15 @@ func NewDB(config Config) (*DB, error) {
 		writeChan:         make(chan writeTask),
 	}
 
+	db.wg.Add(1)
 	go db.processWriteChan()
+
 	return db, nil
 }
 
 // processWriteChan processes all incoming write tasks one at a time.
 func (db *DB) processWriteChan() {
+	defer db.wg.Done()
 	for task := range db.writeChan {
 		tx, found := db.GetTransactionById(task.query.TxId)
 		var result sql.Result
@@ -138,8 +142,18 @@ func (db *DB) processWriteChan() {
 	}
 }
 
-// Close closes all the database connections.
+// Close attempts a graceful shutdown of everything this DB manages.
 func (db *DB) Close() error {
+	close(db.writeChan)
+	db.wg.Wait()
+
+	db.transactionsMutex.Lock()
+	for txId, tx := range db.transactions {
+		_ = tx.Rollback()
+		delete(db.transactions, txId)
+	}
+	db.transactionsMutex.Unlock()
+
 	if db.readWriteConn != nil {
 		if err := db.readWriteConn.Close(); err != nil {
 			return fmt.Errorf("failed to close write connection: %w", err)
