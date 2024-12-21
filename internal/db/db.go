@@ -173,20 +173,27 @@ func (db *DB) Close() error {
 type queryType = enum.Member[string]
 
 var (
-	queryTypeUnknown = queryType{Value: "unknown"}
-	queryTypeRead    = queryType{Value: "read"}
-	queryTypeWrite   = queryType{Value: "write"}
-	queryTypeBegin   = queryType{Value: "begin"}
+	queryTypeUnknown  = queryType{Value: "unknown"}
+	queryTypeRead     = queryType{Value: "read"}
+	queryTypeWrite    = queryType{Value: "write"}
+	queryTypeBegin    = queryType{Value: "begin"}
+	queryTypeCommit   = queryType{Value: "commit"}
+	queryTypeRollback = queryType{Value: "rollback"}
 )
 
-// DetectQueryType detects the type of query between read, write, and begin.
-//
-// It uses sqlite3_stmt_readonly to determine if the query is read-only.
+// DetectQueryType detects the type of query between read, write, begin, commit, and rollback.
 func (db *DB) DetectQueryType(
 	ctx context.Context, query string,
 ) (queryType, error) {
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(query)), "begin") {
+	trimmed := strings.ToLower(strings.TrimSpace(query))
+
+	switch {
+	case strings.HasPrefix(trimmed, "begin"):
 		return queryTypeBegin, nil
+	case strings.HasPrefix(trimmed, "commit"):
+		return queryTypeCommit, nil
+	case strings.HasPrefix(trimmed, "rollback"):
+		return queryTypeRollback, nil
 	}
 
 	conn, err := db.readOnlyConn.Conn(ctx)
@@ -230,6 +237,10 @@ func (db *DB) HandleQuery(
 		return db.ExecuteReadQuery(ctx, query)
 	case queryTypeBegin:
 		return db.ExecuteBeginQuery(ctx, query)
+	case queryTypeCommit:
+		return db.ExecuteCommitQuery(ctx, query)
+	case queryTypeRollback:
+		return db.ExecuteRollbackQuery(ctx, query)
 	case queryTypeWrite:
 		return db.ExecuteWriteQuery(ctx, query)
 	}
@@ -258,6 +269,50 @@ func (db *DB) ExecuteBeginQuery(
 	return QueryResult{
 		Type: queryTypeBegin,
 		TxId: txId.String(),
+	}, nil
+}
+
+// ExecuteCommitQuery commits an existing transaction.
+func (db *DB) ExecuteCommitQuery(
+	ctx context.Context, query Query,
+) (QueryResult, error) {
+	tx, found := db.GetTransactionById(query.TxId)
+	if !found {
+		return QueryResult{}, fmt.Errorf("no transaction found for commit")
+	}
+	if err := tx.Commit(); err != nil {
+		return QueryResult{}, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	db.transactionsMutex.Lock()
+	delete(db.transactions, query.TxId)
+	db.transactionsMutex.Unlock()
+
+	return QueryResult{
+		Type: queryTypeCommit,
+		TxId: query.TxId,
+	}, nil
+}
+
+// ExecuteRollbackQuery rolls back an existing transaction.
+func (db *DB) ExecuteRollbackQuery(
+	ctx context.Context, query Query,
+) (QueryResult, error) {
+	tx, found := db.GetTransactionById(query.TxId)
+	if !found {
+		return QueryResult{}, fmt.Errorf("no transaction found for rollback")
+	}
+	if err := tx.Rollback(); err != nil {
+		return QueryResult{}, fmt.Errorf("failed to rollback transaction: %w", err)
+	}
+
+	db.transactionsMutex.Lock()
+	delete(db.transactions, query.TxId)
+	db.transactionsMutex.Unlock()
+
+	return QueryResult{
+		Type: queryTypeRollback,
+		TxId: query.TxId,
 	}, nil
 }
 
