@@ -6,6 +6,7 @@ require (
 	github.com/alexflint/go-arg v1.5.1
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/orsinium-labs/enum v1.4.0
 	github.com/stretchr/testify v1.10.0
 )
 
