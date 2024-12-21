@@ -119,7 +119,7 @@ func NewDB(config Config) (*DB, error) {
 func (db *DB) processWriteChan() {
 	defer db.wg.Done()
 	for task := range db.writeChan {
-		tx, found := db.GetTransactionById(task.query.TxId)
+		tx, found := db.getTransactionById(task.query.TxId)
 		var result sql.Result
 		var err error
 
@@ -135,7 +135,7 @@ func (db *DB) processWriteChan() {
 		}
 
 		task.resultChan <- QueryResult{
-			Type:        queryTypeWrite,
+			Type:        QueryTypeWrite,
 			WriteResult: result,
 			TxId:        task.query.TxId,
 		}
@@ -173,32 +173,32 @@ func (db *DB) Close() error {
 type queryType = enum.Member[string]
 
 var (
-	queryTypeUnknown  = queryType{Value: "unknown"}
-	queryTypeRead     = queryType{Value: "read"}
-	queryTypeWrite    = queryType{Value: "write"}
-	queryTypeBegin    = queryType{Value: "begin"}
-	queryTypeCommit   = queryType{Value: "commit"}
-	queryTypeRollback = queryType{Value: "rollback"}
+	QueryTypeUnknown  = queryType{Value: "unknown"}
+	QueryTypeRead     = queryType{Value: "read"}
+	QueryTypeWrite    = queryType{Value: "write"}
+	QueryTypeBegin    = queryType{Value: "begin"}
+	QueryTypeCommit   = queryType{Value: "commit"}
+	QueryTypeRollback = queryType{Value: "rollback"}
 )
 
-// DetectQueryType detects the type of query between read, write, begin, commit, and rollback.
-func (db *DB) DetectQueryType(
+// detectQueryType detects the type of query between read, write, begin, commit, and rollback.
+func (db *DB) detectQueryType(
 	ctx context.Context, query string,
 ) (queryType, error) {
 	trimmed := strings.ToLower(strings.TrimSpace(query))
 
 	switch {
 	case strings.HasPrefix(trimmed, "begin"):
-		return queryTypeBegin, nil
+		return QueryTypeBegin, nil
 	case strings.HasPrefix(trimmed, "commit"):
-		return queryTypeCommit, nil
+		return QueryTypeCommit, nil
 	case strings.HasPrefix(trimmed, "rollback"):
-		return queryTypeRollback, nil
+		return QueryTypeRollback, nil
 	}
 
 	conn, err := db.readOnlyConn.Conn(ctx)
 	if err != nil {
-		return queryTypeUnknown, fmt.Errorf("failed to get connection: %w", err)
+		return QueryTypeUnknown, fmt.Errorf("failed to get connection: %w", err)
 	}
 
 	isReadOnly := false
@@ -214,44 +214,42 @@ func (db *DB) DetectQueryType(
 		return nil
 	})
 	if err != nil {
-		return queryTypeUnknown, fmt.Errorf("failed to prepare statement: %w", err)
+		return QueryTypeUnknown, fmt.Errorf("failed to prepare statement: %w", err)
 	}
 
 	if isReadOnly {
-		return queryTypeRead, nil
+		return QueryTypeRead, nil
 	}
-	return queryTypeWrite, nil
+	return QueryTypeWrite, nil
 }
 
-// HandleQuery handles a query based on its type.
-func (db *DB) HandleQuery(
+// Query executes an SQLite query.
+func (db *DB) Query(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
-	typeOfQuery, err := db.DetectQueryType(ctx, query.Query)
+	typeOfQuery, err := db.detectQueryType(ctx, query.Query)
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to detect query type: %w", err)
 	}
 
 	switch typeOfQuery {
-	case queryTypeRead:
-		return db.ExecuteReadQuery(ctx, query)
-	case queryTypeBegin:
-		return db.ExecuteBeginQuery(ctx, query)
-	case queryTypeCommit:
-		return db.ExecuteCommitQuery(ctx, query)
-	case queryTypeRollback:
-		return db.ExecuteRollbackQuery(ctx, query)
-	case queryTypeWrite:
-		return db.ExecuteWriteQuery(ctx, query)
+	case QueryTypeRead:
+		return db.executeReadQuery(ctx, query)
+	case QueryTypeBegin:
+		return db.executeBeginQuery()
+	case QueryTypeCommit:
+		return db.executeCommitQuery(query)
+	case QueryTypeRollback:
+		return db.executeRollbackQuery(query)
+	case QueryTypeWrite:
+		return db.executeWriteQuery(ctx, query)
 	}
 
 	return QueryResult{}, fmt.Errorf("unknown query type: %s", typeOfQuery.Value)
 }
 
-// ExecuteBeginQuery executes a begin query.
-func (db *DB) ExecuteBeginQuery(
-	ctx context.Context, query Query,
-) (QueryResult, error) {
+// executeBeginQuery executes a begin query.
+func (db *DB) executeBeginQuery() (QueryResult, error) {
 	tx, err := db.readWriteConn.Begin()
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to begin transaction: %w", err)
@@ -267,16 +265,14 @@ func (db *DB) ExecuteBeginQuery(
 	db.transactionsMutex.Unlock()
 
 	return QueryResult{
-		Type: queryTypeBegin,
+		Type: QueryTypeBegin,
 		TxId: txId.String(),
 	}, nil
 }
 
-// ExecuteCommitQuery commits an existing transaction.
-func (db *DB) ExecuteCommitQuery(
-	ctx context.Context, query Query,
-) (QueryResult, error) {
-	tx, found := db.GetTransactionById(query.TxId)
+// executeCommitQuery commits an existing transaction.
+func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
+	tx, found := db.getTransactionById(query.TxId)
 	if !found {
 		return QueryResult{}, fmt.Errorf("no transaction found for commit")
 	}
@@ -289,16 +285,14 @@ func (db *DB) ExecuteCommitQuery(
 	db.transactionsMutex.Unlock()
 
 	return QueryResult{
-		Type: queryTypeCommit,
+		Type: QueryTypeCommit,
 		TxId: query.TxId,
 	}, nil
 }
 
-// ExecuteRollbackQuery rolls back an existing transaction.
-func (db *DB) ExecuteRollbackQuery(
-	ctx context.Context, query Query,
-) (QueryResult, error) {
-	tx, found := db.GetTransactionById(query.TxId)
+// executeRollbackQuery rolls back an existing transaction.
+func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
+	tx, found := db.getTransactionById(query.TxId)
 	if !found {
 		return QueryResult{}, fmt.Errorf("no transaction found for rollback")
 	}
@@ -311,13 +305,13 @@ func (db *DB) ExecuteRollbackQuery(
 	db.transactionsMutex.Unlock()
 
 	return QueryResult{
-		Type: queryTypeRollback,
+		Type: QueryTypeRollback,
 		TxId: query.TxId,
 	}, nil
 }
 
-// GetTransactionById returns a transaction by its ID.
-func (db *DB) GetTransactionById(txId string) (*sql.Tx, bool) {
+// getTransactionById returns a transaction by its ID.
+func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
 	if txId == "" {
 		return nil, false
 	}
@@ -329,8 +323,8 @@ func (db *DB) GetTransactionById(txId string) (*sql.Tx, bool) {
 	return tx, found
 }
 
-// ExecuteWriteQuery executes a write query using the single writer channel.
-func (db *DB) ExecuteWriteQuery(
+// executeWriteQuery executes a write query using the single writer channel.
+func (db *DB) executeWriteQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
 	resultChan := make(chan QueryResult)
@@ -355,18 +349,18 @@ func (db *DB) ExecuteWriteQuery(
 	}
 }
 
-// ExecuteReadQuery executes a read query.
-func (db *DB) ExecuteReadQuery(
+// executeReadQuery executes a read query.
+func (db *DB) executeReadQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
-	tx, found := db.GetTransactionById(query.TxId)
+	tx, found := db.getTransactionById(query.TxId)
 	var result *sql.Rows
 	var err error
 
 	if found {
-		result, err = tx.Query(query.Query, query.Params...)
+		result, err = tx.QueryContext(ctx, query.Query, query.Params...)
 	} else {
-		result, err = db.readOnlyConn.Query(query.Query, query.Params...)
+		result, err = db.readOnlyConn.QueryContext(ctx, query.Query, query.Params...)
 	}
 
 	if err != nil {
@@ -374,7 +368,7 @@ func (db *DB) ExecuteReadQuery(
 	}
 
 	return QueryResult{
-		Type:       queryTypeRead,
+		Type:       QueryTypeRead,
 		ReadResult: result,
 		TxId:       query.TxId,
 	}, nil
