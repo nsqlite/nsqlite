@@ -20,10 +20,32 @@ import (
 type DB struct {
 	readWriteConn     *sql.DB
 	readOnlyConn      *sql.DB
-	writeQueue        chan func() sql.Result
-	writeQueueMutex   sync.Mutex
 	transactions      map[string]*sql.Tx
 	transactionsMutex sync.Mutex
+	writeChan         chan writeTask
+}
+
+// writeTask holds the info needed to process a single write request.
+type writeTask struct {
+	ctx        context.Context
+	query      Query
+	resultChan chan QueryResult
+	errorChan  chan error
+}
+
+// Query represents a query to be executed.
+type Query struct {
+	TxId   string
+	Query  string
+	Params []any
+}
+
+// QueryResult represents the result of a query.
+type QueryResult struct {
+	Type        queryType
+	TxId        string
+	WriteResult sql.Result
+	ReadResult  *sql.Rows
 }
 
 // Config represents the configuration for the NewDB function.
@@ -78,14 +100,42 @@ func NewDB(config Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping read connection: %w", err)
 	}
 
-	return &DB{
+	db := &DB{
 		readWriteConn:     readWriteConn,
 		readOnlyConn:      readOnlyConn,
-		writeQueue:        make(chan func() sql.Result),
-		writeQueueMutex:   sync.Mutex{},
 		transactions:      make(map[string]*sql.Tx),
 		transactionsMutex: sync.Mutex{},
-	}, nil
+		writeChan:         make(chan writeTask),
+	}
+
+	go db.processWriteChan()
+	return db, nil
+}
+
+// processWriteChan processes all incoming write tasks one at a time.
+func (db *DB) processWriteChan() {
+	for task := range db.writeChan {
+		tx, found := db.GetTransactionById(task.query.TxId)
+		var result sql.Result
+		var err error
+
+		if found {
+			result, err = tx.Exec(task.query.Query, task.query.Params...)
+		} else {
+			result, err = db.readWriteConn.Exec(task.query.Query, task.query.Params...)
+		}
+
+		if err != nil {
+			task.errorChan <- fmt.Errorf("failed to execute write query: %w", err)
+			continue
+		}
+
+		task.resultChan <- QueryResult{
+			Type:        queryTypeWrite,
+			WriteResult: result,
+			TxId:        task.query.TxId,
+		}
+	}
 }
 
 // Close closes all the database connections.
@@ -152,21 +202,6 @@ func (db *DB) DetectQueryType(
 	return queryTypeWrite, nil
 }
 
-// Query represents a query to be executed
-type Query struct {
-	TxId   string
-	Query  string
-	Params []any
-}
-
-// QueryResult represents the result of a query.
-type QueryResult struct {
-	Type        queryType
-	TxId        string
-	WriteResult sql.Result
-	ReadResult  *sql.Rows
-}
-
 // HandleQuery handles a query based on its type.
 func (db *DB) HandleQuery(
 	ctx context.Context, query Query,
@@ -225,29 +260,30 @@ func (db *DB) GetTransactionById(txId string) (*sql.Tx, bool) {
 	return tx, found
 }
 
-// ExecuteWriteQuery executes a write query.
+// ExecuteWriteQuery executes a write query using the single writer channel.
 func (db *DB) ExecuteWriteQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
-	tx, found := db.GetTransactionById(query.TxId)
-	var result sql.Result
-	var err error
+	resultChan := make(chan QueryResult)
+	errorChan := make(chan error)
 
-	if found {
-		result, err = tx.Exec(query.Query, query.Params...)
-	} else {
-		result, err = db.readWriteConn.Exec(query.Query, query.Params...)
+	task := writeTask{
+		ctx:        ctx,
+		query:      query,
+		resultChan: resultChan,
+		errorChan:  errorChan,
 	}
 
-	if err != nil {
-		return QueryResult{}, fmt.Errorf("failed to execute write query: %w", err)
-	}
+	db.writeChan <- task
 
-	return QueryResult{
-		Type:        queryTypeWrite,
-		WriteResult: result,
-		TxId:        query.TxId,
-	}, nil
+	select {
+	case res := <-resultChan:
+		return res, nil
+	case err := <-errorChan:
+		return QueryResult{}, err
+	case <-ctx.Done():
+		return QueryResult{}, ctx.Err()
+	}
 }
 
 // ExecuteReadQuery executes a read query.
