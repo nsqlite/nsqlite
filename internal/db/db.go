@@ -52,6 +52,9 @@ type QueryResult struct {
 type Config struct {
 	// Directory is the directory where the database files are stored.
 	Directory string
+	// DisableOptimizations disables the startup performance optimizations
+	// for the underlying SQLite database.
+	DisableOptimizations bool
 }
 
 // NewDB creates a new DB instance.
@@ -68,7 +71,6 @@ func NewDB(config Config) (*DB, error) {
 	if err := readWriteConn.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping write connection: %w", err)
 	}
-
 	readWriteConn.SetConnMaxIdleTime(0)
 	readWriteConn.SetConnMaxLifetime(0)
 	readWriteConn.SetMaxIdleConns(1)
@@ -81,7 +83,6 @@ func NewDB(config Config) (*DB, error) {
 	if err := readOnlyConn.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping read connection: %w", err)
 	}
-
 	readOnlyConn.SetConnMaxIdleTime(0)
 	readOnlyConn.SetConnMaxLifetime(0)
 	readOnlyConn.SetMaxIdleConns(5)
@@ -93,11 +94,32 @@ func NewDB(config Config) (*DB, error) {
 		transactionsMutex: sync.Mutex{},
 		writeChan:         make(chan writeTask),
 	}
+	if !config.DisableOptimizations {
+		if err := db.runStartupOptimizations(); err != nil {
+			return nil, fmt.Errorf("failed to run startup optimizations: %w", err)
+		}
+	}
 
 	db.wg.Add(1)
 	go db.processWriteChan()
 
 	return db, nil
+}
+
+// runStartupOptimizations runs the startup optimizations for the underlying
+// SQLite database.
+func (db *DB) runStartupOptimizations() error {
+	_, err := db.readWriteConn.Exec("PRAGMA journal_mode = WAL")
+	if err != nil {
+		return fmt.Errorf("failed to set journal mode: %w", err)
+	}
+
+	_, err = db.readWriteConn.Exec("PRAGMA synchronous = NORMAL")
+	if err != nil {
+		return fmt.Errorf("failed to set synchronous mode: %w", err)
+	}
+
+	return nil
 }
 
 // processWriteChan processes all incoming write tasks one at a time.
