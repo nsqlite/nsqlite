@@ -192,7 +192,7 @@ func (db *DB) detectQueryType(
 		return QueryTypeBegin, nil
 	case strings.HasPrefix(trimmed, "commit"):
 		return QueryTypeCommit, nil
-	case strings.HasPrefix(trimmed, "rollback"):
+	case strings.HasPrefix(trimmed, "rollback"), strings.HasPrefix(trimmed, "end transaction"):
 		return QueryTypeRollback, nil
 	}
 
