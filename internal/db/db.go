@@ -200,6 +200,7 @@ func (db *DB) detectQueryType(
 	if err != nil {
 		return QueryTypeUnknown, fmt.Errorf("failed to get connection: %w", err)
 	}
+	defer conn.Close()
 
 	isReadOnly := false
 	err = conn.Raw(func(driverConn any) error {
