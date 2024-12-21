@@ -2,6 +2,7 @@
 /temp
 /tmp
 /dist
+/.task
 
 # DB Data
 /data
