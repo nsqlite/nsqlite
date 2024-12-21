@@ -3,13 +3,15 @@ package version
 import "fmt"
 
 const version = "v0.0.1"
-
 const asciiArt = `
     _   _______ ____    __    _ __     
    / | / / ___// __ \  / /   (_) /____ 
   /  |/ /\__ \/ / / / / /   / / __/ _ \
  / /|  /___/ / /_/ / / /___/ / /_/  __/
-/_/ |_//____/\___\_\/_____/_/\__/\___/`
+/_/ |_//____/\___\_\/_____/_/\__/\___/
+%s ` + version + `
+
+For more information visit https://github.com/nsqlite/nsqlite and if you like the project, please leave a star on GitHub.`
 
 // AsciiArt returns the ASCII art of nsqlited.
 func AsciiArt() string {
@@ -17,12 +19,12 @@ func AsciiArt() string {
 	return asciiArt[1:]
 }
 
-// NSQLitedVersion returns the version of nsqlited.
-func NSQLitedVersion() string {
-	return fmt.Sprintf("%s\nServer %s", AsciiArt(), version)
+// ServerVersion returns the server version of nsqlited.
+func ServerVersion() string {
+	return fmt.Sprintf(AsciiArt(), "Server")
 }
 
-// NSQLiteVersion returns the version of nsqlite.
-func NSQLiteVersion() string {
-	return fmt.Sprintf("%s\nClient %s", AsciiArt(), version)
+// ClientVersion returns the client version of nsqlite.
+func ClientVersion() string {
+	return fmt.Sprintf(AsciiArt(), "Client")
 }
