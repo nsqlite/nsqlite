@@ -13,11 +13,12 @@ import (
 
 // Config represents the configuration for nsqlited.
 type Config struct {
-	HttpListenAddr string `arg:"--http-listen-addr,env:NSQLITE_HTTP_LISTEN_ADDR" help:"HTTP listen address" default:"0.0.0.0"`
-	HttpListenPort string `arg:"--http-listen-port,env:NSQLITE_HTTP_LISTEN_PORT" help:"HTTP listen port" default:"9876"`
-	AuthEnabled    bool   `arg:"--auth-enabled,env:NSQLITE_AUTH_ENABLED" help:"Enable auth" default:"false"`
-	AuthAlgorithm  string `arg:"--auth-algorithm,env:NSQLITE_AUTH_ALGORITHM" help:"Auth hash algorithm for token (plaintext, sha256, bcrypt)" default:"plaintext"`
-	AuthToken      string `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Auth token, required if auth enabled (should be hashed if algorithm is not plaintext)"`
+	HttpListenAddr   string `arg:"--http-listen-addr,env:NSQLITE_HTTP_LISTEN_ADDR" help:"HTTP listen address" default:"0.0.0.0"`
+	HttpListenPort   string `arg:"--http-listen-port,env:NSQLITE_HTTP_LISTEN_PORT" help:"HTTP listen port" default:"9876"`
+	AuthEnabled      bool   `arg:"--auth-enabled,env:NSQLITE_AUTH_ENABLED" help:"Enable auth" default:"false"`
+	AuthAlgorithm    string `arg:"--auth-algorithm,env:NSQLITE_AUTH_ALGORITHM" help:"Auth hash algorithm for token (plaintext, sha256, bcrypt)" default:"plaintext"`
+	AuthToken        string `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Auth token, required if auth enabled (should be hashed if algorithm is not plaintext)"`
+	ReadOnlyPoolSize int    `arg:"--read-only-pool-size,env:NSQLITE_READ_ONLY_POOL_SIZE" help:"Number of connections for the read-only pool (default: number of CPUs * 2)"`
 }
 
 func (Config) Version() string {
