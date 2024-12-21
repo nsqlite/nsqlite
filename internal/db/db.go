@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -53,8 +52,6 @@ type QueryResult struct {
 type Config struct {
 	// Directory is the directory where the database files are stored.
 	Directory string
-	// ReadOnlyPoolSize is the number of connections for the read-only pool.
-	ReadOnlyPoolSize int
 }
 
 // NewDB creates a new DB instance.
@@ -68,38 +65,26 @@ func NewDB(config Config) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
 	}
+	if err := readWriteConn.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping write connection: %w", err)
+	}
 
 	readWriteConn.SetConnMaxIdleTime(0)
 	readWriteConn.SetConnMaxLifetime(0)
 	readWriteConn.SetMaxIdleConns(1)
 	readWriteConn.SetMaxOpenConns(1)
-	if err := readWriteConn.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping write connection: %w", err)
-	}
 
 	readOnlyConn, err := sql.Open("sqlite3", databasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open read connection: %w", err)
 	}
-
-	maxIdleConns := 1
-	maxOpenConns := 1
-	if config.ReadOnlyPoolSize < 1 {
-		maxIdleConns = runtime.NumCPU()
-		maxOpenConns = runtime.NumCPU() * 2
-	}
-	if config.ReadOnlyPoolSize > 1 {
-		maxIdleConns = config.ReadOnlyPoolSize / 2
-		maxOpenConns = config.ReadOnlyPoolSize
+	if err := readOnlyConn.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping read connection: %w", err)
 	}
 
 	readOnlyConn.SetConnMaxIdleTime(0)
 	readOnlyConn.SetConnMaxLifetime(0)
-	readOnlyConn.SetMaxIdleConns(maxIdleConns)
-	readOnlyConn.SetMaxOpenConns(maxOpenConns)
-	if err := readOnlyConn.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping read connection: %w", err)
-	}
+	readOnlyConn.SetMaxIdleConns(5)
 
 	db := &DB{
 		readWriteConn:     readWriteConn,
