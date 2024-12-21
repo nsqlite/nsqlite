@@ -151,7 +151,7 @@ func Test_validateAuthAlgorithm(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateAuthAlgorithm(tt.algorithm)
+			err := validateAuthTokenAlgorithm(tt.algorithm)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.algorithm != "" {

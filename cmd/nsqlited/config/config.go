@@ -13,11 +13,12 @@ import (
 
 // Config represents the configuration for nsqlited.
 type Config struct {
-	HttpListenAddr string `arg:"--http-listen-addr,env:NSQLITE_HTTP_LISTEN_ADDR" help:"HTTP listen address" default:"0.0.0.0"`
-	HttpListenPort string `arg:"--http-listen-port,env:NSQLITE_HTTP_LISTEN_PORT" help:"HTTP listen port" default:"9876"`
-	AuthEnabled    bool   `arg:"--auth-enabled,env:NSQLITE_AUTH_ENABLED" help:"Enable auth" default:"false"`
-	AuthAlgorithm  string `arg:"--auth-algorithm,env:NSQLITE_AUTH_ALGORITHM" help:"Auth hash algorithm for token (plaintext, sha256, bcrypt)" default:"plaintext"`
-	AuthToken      string `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Auth token, required if auth enabled (should be hashed if algorithm is not plaintext)"`
+	DataDirectory        string `arg:"--data-directory,env:NSQLITE_DATA_DIRECTORY" help:"Directory for NSQLite database files" default:"./data"`
+	AuthTokenAlgorithm   string `arg:"--auth-token-algorithm,env:NSQLITE_AUTH_TOKEN_ALGORITHM" help:"Hash algorithm for the auth token (plaintext, argon2, bcrypt)" default:"plaintext"`
+	AuthToken            string `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Pre-hashed auth token; leave empty to disable authentication"`
+	DisableOptimizations bool   `arg:"--disable-optimizations,env:NSQLITE_DISABLE_OPTIMIZATIONS" help:"Disable performance optimizations at startup for the underlying SQLite database, allowing manual tuning" default:"false"`
+	ListenAddr           string `arg:"--listen-addr,env:NSQLITE_LISTEN_ADDR" help:"Address for the server to listen on" default:"0.0.0.0"`
+	ListenPort           string `arg:"--listen-port,env:NSQLITE_LISTEN_PORT" help:"Port for the server to listen on" default:"9876"`
 }
 
 func (Config) Version() string {
@@ -39,20 +40,16 @@ func MustParse(args []string) Config {
 	}
 	parser.MustParse(args[1:])
 
-	if err := validateListenAddr(cfg.HttpListenAddr); err != nil {
+	if err := validateListenAddr(cfg.ListenAddr); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := validateListenPort(cfg.HttpListenPort); err != nil {
+	if err := validateListenPort(cfg.ListenPort); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := validateAuthAlgorithm(cfg.AuthAlgorithm); err != nil {
+	if err := validateAuthTokenAlgorithm(cfg.AuthTokenAlgorithm); err != nil {
 		log.Fatal(err)
-	}
-
-	if cfg.AuthEnabled && cfg.AuthToken == "" {
-		log.Fatal(errors.New("auth token is required if auth is enabled"))
 	}
 
 	return cfg
@@ -76,9 +73,9 @@ func validateListenPort(port string) error {
 	return nil
 }
 
-// validateAuthAlgorithm validates if algorithm is a valid auth algorithm.
-func validateAuthAlgorithm(algorithm string) error {
-	valid := []string{"plaintext", "sha256", "bcrypt"}
+// validateAuthTokenAlgorithm validates if algorithm is a valid auth algorithm.
+func validateAuthTokenAlgorithm(algorithm string) error {
+	valid := []string{"plaintext", "argon2", "bcrypt"}
 
 	for _, v := range valid {
 		if algorithm == v {
