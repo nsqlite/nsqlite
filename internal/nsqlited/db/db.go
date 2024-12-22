@@ -4,18 +4,31 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
 	"github.com/orsinium-labs/enum"
 )
+
+// DBStats holds counters and status info about DB usage.
+type DBStats struct {
+	TotalReadQueries     int64 `json:"total_read_queries"`
+	TotalWriteQueries    int64 `json:"total_write_queries"`
+	TotalBeginQueries    int64 `json:"total_begin_queries"`
+	TotalCommitQueries   int64 `json:"total_commit_queries"`
+	TotalRollbackQueries int64 `json:"total_rollback_queries"`
+	TransactionsInFlight int64 `json:"-"` // Derived in real time, not persistent.
+	WriteQueueLength     int64 `json:"-"` // Derived in real time, not persistent.
+}
 
 // transactionData holds a *sql.Tx and the last time it was accessed.
 type transactionData struct {
@@ -31,6 +44,10 @@ type DB struct {
 	transactionsMutex       sync.Mutex
 	transactionsMonitorStop chan any
 	writeChan               chan writeTask
+	writeQueueCount         int64
+	stats                   DBStats
+	statsFilePath           string
+	statsStop               chan any
 	wg                      sync.WaitGroup
 }
 
@@ -99,6 +116,7 @@ func NewDB(config Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
+	statsFilePath := path.Join(config.Directory, "stats.json")
 	databasePath := path.Join(config.Directory, "database.sqlite")
 	readWriteDSN := createDSN(databasePath, false, config.DisableOptimizations)
 	readOnlyDSN := createDSN(databasePath, true, config.DisableOptimizations)
@@ -133,8 +151,14 @@ func NewDB(config Config) (*DB, error) {
 		transactionsMutex:       sync.Mutex{},
 		transactionsMonitorStop: make(chan any),
 		writeChan:               make(chan writeTask),
+		writeQueueCount:         0,
+		stats:                   DBStats{},
+		statsFilePath:           statsFilePath,
+		statsStop:               make(chan any),
 		wg:                      sync.WaitGroup{},
 	}
+
+	db.loadStatsFromFile()
 
 	db.wg.Add(1)
 	go db.processWriteChan()
@@ -142,7 +166,66 @@ func NewDB(config Config) (*DB, error) {
 	db.wg.Add(1)
 	go db.monitorIdleTransactions(config.TransactionIdleTimeout)
 
+	db.wg.Add(1)
+	go db.runStatsSync()
+
 	return db, nil
+}
+
+// loadStatsFromFile loads counters from the JSON file if present.
+func (db *DB) loadStatsFromFile() {
+	b, err := os.ReadFile(db.statsFilePath)
+	if err != nil {
+		return
+	}
+
+	stats := DBStats{}
+	if err := json.Unmarshal(b, &stats); err != nil {
+		return
+	}
+
+	atomic.StoreInt64(&db.stats.TotalReadQueries, stats.TotalReadQueries)
+	atomic.StoreInt64(&db.stats.TotalWriteQueries, stats.TotalWriteQueries)
+	atomic.StoreInt64(&db.stats.TotalBeginQueries, stats.TotalBeginQueries)
+	atomic.StoreInt64(&db.stats.TotalCommitQueries, stats.TotalCommitQueries)
+	atomic.StoreInt64(&db.stats.TotalRollbackQueries, stats.TotalRollbackQueries)
+}
+
+// saveStatsToFile stores counters (except in-flight data) into the JSON file.
+func (db *DB) saveStatsToFile() {
+	stats := DBStats{
+		TotalReadQueries:     atomic.LoadInt64(&db.stats.TotalReadQueries),
+		TotalWriteQueries:    atomic.LoadInt64(&db.stats.TotalWriteQueries),
+		TotalBeginQueries:    atomic.LoadInt64(&db.stats.TotalBeginQueries),
+		TotalCommitQueries:   atomic.LoadInt64(&db.stats.TotalCommitQueries),
+		TotalRollbackQueries: atomic.LoadInt64(&db.stats.TotalRollbackQueries),
+	}
+
+	b, err := json.Marshal(stats)
+	if err != nil {
+		return
+	}
+
+	if err := os.WriteFile(db.statsFilePath, b, 0644); err != nil {
+		return
+	}
+}
+
+// runStatsSync periodically flushes stats to the JSON file.
+func (db *DB) runStatsSync() {
+	defer db.wg.Done()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-db.statsStop:
+			db.saveStatsToFile()
+			return
+		case <-ticker.C:
+			db.saveStatsToFile()
+		}
+	}
 }
 
 // monitorIdleTransactions rolls back transactions not used within the timeout.
@@ -171,39 +254,14 @@ func (db *DB) monitorIdleTransactions(timeout time.Duration) {
 	}
 }
 
-// processWriteChan processes all incoming write tasks one at a time.
-func (db *DB) processWriteChan() {
-	defer db.wg.Done()
-	for task := range db.writeChan {
-		tx, found := db.getTransactionById(task.query.TxId)
-		var result sql.Result
-		var err error
-
-		if found {
-			result, err = tx.Exec(task.query.Query, task.query.Params...)
-		} else {
-			result, err = db.readWriteConn.Exec(task.query.Query, task.query.Params...)
-		}
-
-		if err != nil {
-			task.errorChan <- fmt.Errorf("failed to execute write query: %w", err)
-			continue
-		}
-
-		task.resultChan <- QueryResult{
-			Type:        QueryTypeWrite,
-			WriteResult: result,
-			TxId:        task.query.TxId,
-		}
-	}
-}
-
 // Close attempts a graceful shutdown of everything this DB manages.
 func (db *DB) Close() error {
 	close(db.writeChan)
 	close(db.transactionsMonitorStop)
+	close(db.statsStop)
 
 	db.wg.Wait()
+	db.saveStatsToFile()
 
 	db.transactionsMutex.Lock()
 	for txId, data := range db.transactions {
@@ -225,6 +283,35 @@ func (db *DB) Close() error {
 	}
 
 	return nil
+}
+
+// processWriteChan processes all incoming write tasks one at a time.
+func (db *DB) processWriteChan() {
+	defer db.wg.Done()
+	for task := range db.writeChan {
+		tx, found := db.getTransactionById(task.query.TxId)
+		var result sql.Result
+		var err error
+
+		if found {
+			result, err = tx.Exec(task.query.Query, task.query.Params...)
+		} else {
+			result, err = db.readWriteConn.Exec(task.query.Query, task.query.Params...)
+		}
+
+		if err != nil {
+			task.errorChan <- fmt.Errorf("failed to execute write query: %w", err)
+			continue
+		}
+
+		atomic.AddInt64(&db.stats.TotalWriteQueries, 1)
+
+		task.resultChan <- QueryResult{
+			Type:        QueryTypeWrite,
+			WriteResult: result,
+			TxId:        task.query.TxId,
+		}
+	}
 }
 
 // queryType represents the type of a given SQLite query.
@@ -327,6 +414,8 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 	db.transactions[txId.String()] = data
 	db.transactionsMutex.Unlock()
 
+	atomic.AddInt64(&db.stats.TotalBeginQueries, 1)
+
 	return QueryResult{
 		Type: QueryTypeBegin,
 		TxId: txId.String(),
@@ -347,6 +436,8 @@ func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 	delete(db.transactions, query.TxId)
 	db.transactionsMutex.Unlock()
 
+	atomic.AddInt64(&db.stats.TotalCommitQueries, 1)
+
 	return QueryResult{
 		Type: QueryTypeCommit,
 		TxId: query.TxId,
@@ -366,6 +457,8 @@ func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 	db.transactionsMutex.Lock()
 	delete(db.transactions, query.TxId)
 	db.transactionsMutex.Unlock()
+
+	atomic.AddInt64(&db.stats.TotalRollbackQueries, 1)
 
 	return QueryResult{
 		Type: QueryTypeRollback,
@@ -394,10 +487,13 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
 	return data.tx, true
 }
 
-// executeWriteQuery executes a write query using the single writer channel.
+// executeWriteQuery increments the write queue count, sends the task,
+// waits for a response, and then decrements the counter.
 func (db *DB) executeWriteQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
+	atomic.AddInt64(&db.writeQueueCount, 1)
+
 	resultChan := make(chan QueryResult)
 	errorChan := make(chan error)
 
@@ -412,10 +508,13 @@ func (db *DB) executeWriteQuery(
 
 	select {
 	case res := <-resultChan:
+		atomic.AddInt64(&db.writeQueueCount, -1)
 		return res, nil
 	case err := <-errorChan:
+		atomic.AddInt64(&db.writeQueueCount, -1)
 		return QueryResult{}, err
 	case <-ctx.Done():
+		atomic.AddInt64(&db.writeQueueCount, -1)
 		return QueryResult{}, ctx.Err()
 	}
 }
@@ -440,9 +539,31 @@ func (db *DB) executeReadQuery(
 		return QueryResult{}, fmt.Errorf("failed to execute read query: %w", err)
 	}
 
+	atomic.AddInt64(&db.stats.TotalReadQueries, 1)
+
 	return QueryResult{
 		Type:       QueryTypeRead,
 		ReadResult: result,
 		TxId:       query.TxId,
 	}, nil
+}
+
+// GetStats returns the current DBStats. The persistent counters are loaded
+// atomically, while TransactionsInFlight and WriteQueueLength are derived in
+// real time.
+func (db *DB) GetStats() DBStats {
+	var stats DBStats
+	stats.TotalReadQueries = atomic.LoadInt64(&db.stats.TotalReadQueries)
+	stats.TotalWriteQueries = atomic.LoadInt64(&db.stats.TotalWriteQueries)
+	stats.TotalBeginQueries = atomic.LoadInt64(&db.stats.TotalBeginQueries)
+	stats.TotalCommitQueries = atomic.LoadInt64(&db.stats.TotalCommitQueries)
+	stats.TotalRollbackQueries = atomic.LoadInt64(&db.stats.TotalRollbackQueries)
+
+	db.transactionsMutex.Lock()
+	stats.TransactionsInFlight = int64(len(db.transactions))
+	db.transactionsMutex.Unlock()
+
+	stats.WriteQueueLength = atomic.LoadInt64(&db.writeQueueCount)
+
+	return stats
 }
