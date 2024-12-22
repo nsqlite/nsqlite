@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -46,7 +47,7 @@ func Test_validateListenAddr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateListenAddr(tt.addr)
+			err := validateListenHost(tt.addr)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -157,6 +158,41 @@ func Test_validateAuthAlgorithm(t *testing.T) {
 				if tt.algorithm != "" {
 					assert.Contains(t, err.Error(), "valid values are")
 				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func Test_validateTransactionTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		wantErr  bool
+	}{
+		{
+			name:     "valid - 1 second",
+			duration: time.Second,
+			wantErr:  false,
+		},
+		{
+			name:     "valid - 1 minute",
+			duration: time.Minute,
+			wantErr:  false,
+		},
+		{
+			name:     "invalid - negative",
+			duration: -time.Second,
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTransactionTimeout(tt.duration)
+			if tt.wantErr {
+				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
