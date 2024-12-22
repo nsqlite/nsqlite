@@ -17,8 +17,38 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
+	"github.com/nsqlite/nsqlite/internal/log"
 	"github.com/orsinium-labs/enum"
 )
+
+// Config represents the configuration for a DB instance.
+type Config struct {
+	// Logger is the shared NSQLite logger.
+	Logger log.Logger
+	// Directory is the directory where the database files are stored.
+	Directory string
+	// DisableOptimizations disables the startup performance optimizations
+	// for the underlying SQLite database.
+	DisableOptimizations bool
+	// TransactionIdleTimeout if a transaction is not active for this duration, it
+	// will be rolled back.
+	TransactionIdleTimeout time.Duration
+}
+
+// DB represents the SQLite integration for NSQLite.
+type DB struct {
+	readWriteConn           *sql.DB
+	readOnlyConn            *sql.DB
+	transactions            map[string]transactionData
+	transactionsMutex       sync.Mutex
+	transactionsMonitorStop chan any
+	writeChan               chan writeTask
+	writeQueueCount         int64
+	stats                   DBStats
+	statsFilePath           string
+	statsStop               chan any
+	wg                      sync.WaitGroup
+}
 
 // DBStats holds counters and status info about DB usage.
 type DBStats struct {
@@ -35,21 +65,6 @@ type DBStats struct {
 type transactionData struct {
 	tx       *sql.Tx
 	lastUsed time.Time
-}
-
-// DB represents the SQLite integration for NSQLite.
-type DB struct {
-	readWriteConn           *sql.DB
-	readOnlyConn            *sql.DB
-	transactions            map[string]transactionData
-	transactionsMutex       sync.Mutex
-	transactionsMonitorStop chan any
-	writeChan               chan writeTask
-	writeQueueCount         int64
-	stats                   DBStats
-	statsFilePath           string
-	statsStop               chan any
-	wg                      sync.WaitGroup
 }
 
 // writeTask holds the info needed to process a single write request.
@@ -73,18 +88,6 @@ type QueryResult struct {
 	TxId        string
 	WriteResult sql.Result
 	ReadResult  *sql.Rows
-}
-
-// Config represents the configuration for the NewDB function.
-type Config struct {
-	// Directory is the directory where the database files are stored.
-	Directory string
-	// DisableOptimizations disables the startup performance optimizations
-	// for the underlying SQLite database.
-	DisableOptimizations bool
-	// TransactionIdleTimeout if a transaction is not active for this duration, it
-	// will be rolled back.
-	TransactionIdleTimeout time.Duration
 }
 
 func createDSN(
