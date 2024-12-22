@@ -37,6 +37,7 @@ type Config struct {
 
 // DB represents the SQLite integration for NSQLite.
 type DB struct {
+	isInitialized           bool
 	readWriteConn           *sql.DB
 	readOnlyConn            *sql.DB
 	transactions            map[string]transactionData
@@ -116,6 +117,9 @@ func createDSN(
 
 // NewDB creates a new DB instance.
 func NewDB(config Config) (*DB, error) {
+	if !config.Logger.IsInitialized() {
+		return nil, errors.New("logger is required")
+	}
 	if config.Directory == "" {
 		return nil, errors.New("database directory is required")
 	}
@@ -155,6 +159,7 @@ func NewDB(config Config) (*DB, error) {
 	readOnlyConn.SetMaxIdleConns(5)
 
 	db := &DB{
+		isInitialized:           true,
 		readWriteConn:           readWriteConn,
 		readOnlyConn:            readOnlyConn,
 		transactions:            make(map[string]transactionData),
@@ -179,7 +184,13 @@ func NewDB(config Config) (*DB, error) {
 	db.wg.Add(1)
 	go db.runStatsSync()
 
+	config.Logger.InfoNs(log.NsDatabase, "database started")
 	return db, nil
+}
+
+// IsInitialized returns whether the DB instance is initialized.
+func (db *DB) IsInitialized() bool {
+	return db.isInitialized
 }
 
 // loadStatsFromFile loads counters from the JSON file if present.
