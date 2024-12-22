@@ -17,14 +17,21 @@ import (
 	"github.com/orsinium-labs/enum"
 )
 
+// transactionData holds a *sql.Tx and the last time it was accessed.
+type transactionData struct {
+	tx       *sql.Tx
+	lastUsed time.Time
+}
+
 // DB represents the SQLite integration for NSQLite.
 type DB struct {
-	readWriteConn     *sql.DB
-	readOnlyConn      *sql.DB
-	transactions      map[string]*sql.Tx
-	transactionsMutex sync.Mutex
-	writeChan         chan writeTask
-	wg                sync.WaitGroup
+	readWriteConn           *sql.DB
+	readOnlyConn            *sql.DB
+	transactions            map[string]transactionData
+	transactionsMutex       sync.Mutex
+	transactionsMonitorStop chan any
+	writeChan               chan writeTask
+	wg                      sync.WaitGroup
 }
 
 // writeTask holds the info needed to process a single write request.
@@ -57,7 +64,8 @@ type Config struct {
 	// DisableOptimizations disables the startup performance optimizations
 	// for the underlying SQLite database.
 	DisableOptimizations bool
-	// TransactionIdleTimeout if a transaction is not active for this duration, it will be rolled back.
+	// TransactionIdleTimeout if a transaction is not active for this duration, it
+	// will be rolled back.
 	TransactionIdleTimeout time.Duration
 }
 
@@ -91,11 +99,9 @@ func NewDB(config Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	var (
-		databasePath = path.Join(config.Directory, "database.sqlite")
-		readWriteDSN = createDSN(databasePath, false, config.DisableOptimizations)
-		readOnlyDSN  = createDSN(databasePath, true, config.DisableOptimizations)
-	)
+	databasePath := path.Join(config.Directory, "database.sqlite")
+	readWriteDSN := createDSN(databasePath, false, config.DisableOptimizations)
+	readOnlyDSN := createDSN(databasePath, true, config.DisableOptimizations)
 
 	readWriteConn, err := sql.Open("sqlite3", readWriteDSN)
 	if err != nil {
@@ -121,17 +127,48 @@ func NewDB(config Config) (*DB, error) {
 	readOnlyConn.SetMaxIdleConns(5)
 
 	db := &DB{
-		readWriteConn:     readWriteConn,
-		readOnlyConn:      readOnlyConn,
-		transactions:      make(map[string]*sql.Tx),
-		transactionsMutex: sync.Mutex{},
-		writeChan:         make(chan writeTask),
+		readWriteConn:           readWriteConn,
+		readOnlyConn:            readOnlyConn,
+		transactions:            make(map[string]transactionData),
+		transactionsMutex:       sync.Mutex{},
+		transactionsMonitorStop: make(chan any),
+		writeChan:               make(chan writeTask),
+		wg:                      sync.WaitGroup{},
 	}
 
 	db.wg.Add(1)
 	go db.processWriteChan()
 
+	db.wg.Add(1)
+	go db.monitorIdleTransactions(config.TransactionIdleTimeout)
+
 	return db, nil
+}
+
+// monitorIdleTransactions rolls back transactions not used within the timeout.
+func (db *DB) monitorIdleTransactions(timeout time.Duration) {
+	defer db.wg.Done()
+	ticker := time.NewTicker(timeout / 2)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-db.transactionsMonitorStop:
+			return
+		case <-ticker.C:
+			func() {
+				db.transactionsMutex.Lock()
+				defer db.transactionsMutex.Unlock()
+				now := time.Now()
+				for txID, data := range db.transactions {
+					if now.Sub(data.lastUsed) > timeout {
+						_ = data.tx.Rollback()
+						delete(db.transactions, txID)
+					}
+				}
+			}()
+		}
+	}
 }
 
 // processWriteChan processes all incoming write tasks one at a time.
@@ -164,11 +201,13 @@ func (db *DB) processWriteChan() {
 // Close attempts a graceful shutdown of everything this DB manages.
 func (db *DB) Close() error {
 	close(db.writeChan)
+	close(db.transactionsMonitorStop)
+
 	db.wg.Wait()
 
 	db.transactionsMutex.Lock()
-	for txId, tx := range db.transactions {
-		_ = tx.Rollback()
+	for txId, data := range db.transactions {
+		_ = data.tx.Rollback()
 		delete(db.transactions, txId)
 	}
 	db.transactionsMutex.Unlock()
@@ -200,7 +239,8 @@ var (
 	QueryTypeRollback = queryType{Value: "rollback"}
 )
 
-// detectQueryType detects the type of query between read, write, begin, commit, and rollback.
+// detectQueryType detects the type of query between read, write, begin, commit,
+// and rollback.
 func (db *DB) detectQueryType(
 	ctx context.Context, query string,
 ) (queryType, error) {
@@ -244,9 +284,7 @@ func (db *DB) detectQueryType(
 }
 
 // Query executes an SQLite query.
-func (db *DB) Query(
-	ctx context.Context, query Query,
-) (QueryResult, error) {
+func (db *DB) Query(ctx context.Context, query Query) (QueryResult, error) {
 	typeOfQuery, err := db.detectQueryType(ctx, query.Query)
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to detect query type: %w", err)
@@ -280,8 +318,13 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 		return QueryResult{}, fmt.Errorf("failed to generate transaction ID: %w", err)
 	}
 
+	data := transactionData{
+		tx:       tx,
+		lastUsed: time.Now(),
+	}
+
 	db.transactionsMutex.Lock()
-	db.transactions[txId.String()] = tx
+	db.transactions[txId.String()] = data
 	db.transactionsMutex.Unlock()
 
 	return QueryResult{
@@ -330,7 +373,8 @@ func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 	}, nil
 }
 
-// getTransactionById returns a transaction by its ID.
+// getTransactionById returns a transaction by its ID and updates its
+// lastUsed time.
 func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
 	if txId == "" {
 		return nil, false
@@ -339,8 +383,15 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
 	db.transactionsMutex.Lock()
 	defer db.transactionsMutex.Unlock()
 
-	tx, found := db.transactions[txId]
-	return tx, found
+	data, found := db.transactions[txId]
+	if !found {
+		return nil, false
+	}
+
+	data.lastUsed = time.Now()
+	db.transactions[txId] = data
+
+	return data.tx, true
 }
 
 // executeWriteQuery executes a write query using the single writer channel.
@@ -374,8 +425,10 @@ func (db *DB) executeReadQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
 	tx, found := db.getTransactionById(query.TxId)
-	var result *sql.Rows
-	var err error
+	var (
+		result *sql.Rows
+		err    error
+	)
 
 	if found {
 		result, err = tx.QueryContext(ctx, query.Query, query.Params...)
