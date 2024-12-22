@@ -8,7 +8,8 @@ import (
 // Logger is a custom structured logger on top of slog.Logger
 // that logs in JSON format.
 type Logger struct {
-	slogger *slog.Logger
+	isInitialized bool
+	slogger       *slog.Logger
 }
 
 // NewLogger creates a new Logger that writes to the given writer.
@@ -16,8 +17,15 @@ type Logger struct {
 func NewLogger(writer io.Writer) Logger {
 	slogger := slog.New(slog.NewJSONHandler(writer, nil))
 	return Logger{
-		slogger: slogger,
+		isInitialized: true,
+		slogger:       slogger,
 	}
+}
+
+// IsInitialized returns true if the logger is initialized using
+// NewLogger function.
+func (l *Logger) IsInitialized() bool {
+	return l.isInitialized
 }
 
 // Info logs structured info message.
