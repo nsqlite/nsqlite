@@ -13,9 +13,9 @@ type Logger struct {
 
 // NewLogger creates a new Logger that writes to the given writer.
 // The writer is typically os.Stdout but can be any io.Writer.
-func NewLogger(writer io.Writer) *Logger {
+func NewLogger(writer io.Writer) Logger {
 	slogger := slog.New(slog.NewJSONHandler(writer, nil))
-	return &Logger{
+	return Logger{
 		slogger: slogger,
 	}
 }
