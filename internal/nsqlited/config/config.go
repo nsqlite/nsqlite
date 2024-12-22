@@ -14,13 +14,13 @@ import (
 
 // Config represents the configuration for nsqlited.
 type Config struct {
-	DataDirectory        string        `arg:"--data-directory,env:NSQLITE_DATA_DIRECTORY" help:"Directory for NSQLite database files" default:"./data"`
-	AuthTokenAlgorithm   string        `arg:"--auth-token-algorithm,env:NSQLITE_AUTH_TOKEN_ALGORITHM" help:"Hash algorithm for the auth token (plaintext, argon2, bcrypt)" default:"plaintext"`
-	AuthToken            string        `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Pre-hashed auth token; leave empty to disable authentication"`
-	DisableOptimizations bool          `arg:"--disable-optimizations,env:NSQLITE_DISABLE_OPTIMIZATIONS" help:"Disable performance optimizations at startup for the underlying SQLite database, allowing manual tuning" default:"false"`
-	ListenAddr           string        `arg:"--listen-addr,env:NSQLITE_LISTEN_ADDR" help:"Address for the server to listen on" default:"0.0.0.0"`
-	ListenPort           string        `arg:"--listen-port,env:NSQLITE_LISTEN_PORT" help:"Port for the server to listen on" default:"9876"`
-	TransactionTimeout   time.Duration `arg:"--transaction-timeout,env:NSQLITE_TRANSACTION_TIMEOUT" help:"If a transaction is not active for this duration, it will be rolled back. Valid time units are ns, us (or µs), ms, s, m, h" default:"5m"`
+	DataDirectory          string        `arg:"--data-directory,env:NSQLITE_DATA_DIRECTORY" help:"Directory for NSQLite database files" default:"./data"`
+	AuthTokenAlgorithm     string        `arg:"--auth-token-algorithm,env:NSQLITE_AUTH_TOKEN_ALGORITHM" help:"Hash algorithm for the auth token (plaintext, argon2, bcrypt)" default:"plaintext"`
+	AuthToken              string        `arg:"--auth-token,env:NSQLITE_AUTH_TOKEN" help:"Pre-hashed auth token; leave empty to disable authentication"`
+	DisableOptimizations   bool          `arg:"--disable-optimizations,env:NSQLITE_DISABLE_OPTIMIZATIONS" help:"Disable performance optimizations at startup for the underlying SQLite database, allowing manual tuning" default:"false"`
+	ListenAddr             string        `arg:"--listen-addr,env:NSQLITE_LISTEN_ADDR" help:"Address for the server to listen on" default:"0.0.0.0"`
+	ListenPort             string        `arg:"--listen-port,env:NSQLITE_LISTEN_PORT" help:"Port for the server to listen on" default:"9876"`
+	TransactionIdleTimeout time.Duration `arg:"--transaction-idle-timeout,env:NSQLITE_TRANSACTION_IDLE_TIMEOUT" help:"If a transaction is not active for this duration, it will be rolled back. Valid time units are ns, us (or µs), ms, s, m, h" default:"5m"`
 }
 
 func (Config) Version() string {

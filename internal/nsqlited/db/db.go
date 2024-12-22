@@ -57,8 +57,8 @@ type Config struct {
 	// DisableOptimizations disables the startup performance optimizations
 	// for the underlying SQLite database.
 	DisableOptimizations bool
-	// TransactionTimeout if a transaction is not active for this duration, it will be rolled back.
-	TransactionTimeout time.Duration
+	// TransactionIdleTimeout if a transaction is not active for this duration, it will be rolled back.
+	TransactionIdleTimeout time.Duration
 }
 
 func createDSN(
