@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -57,14 +58,43 @@ type Config struct {
 	DisableOptimizations bool
 }
 
+func createDSN(
+	dbPath string, isReadOnly bool, disableOptimizations bool,
+) string {
+	qp := url.Values{}
+	qp.Add("_foreign_keys", "true")
+	qp.Add("_busy_timeout", "5000")
+
+	if isReadOnly {
+		qp.Add("_query_only", "true")
+	}
+
+	if !disableOptimizations {
+		qp.Add("_journal_mode", "WAL")
+		qp.Add("_synchronous", "NORMAL")
+		qp.Add("_cache_size", "10000")
+
+		// TODO: Implement a way to set these optimizations.
+		// - PRAGMA temp_store = MEMORY;
+		// - PRAGMA mmap_size = 536870912; // 512MB
+	}
+
+	return fmt.Sprintf("file:%s?%s", dbPath, qp.Encode())
+}
+
 // NewDB creates a new DB instance.
 func NewDB(config Config) (*DB, error) {
 	if err := os.MkdirAll(config.Directory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	databasePath := path.Join(config.Directory, "database.sqlite")
-	readWriteConn, err := sql.Open("sqlite3", databasePath)
+	var (
+		databasePath = path.Join(config.Directory, "database.sqlite")
+		readWriteDSN = createDSN(databasePath, false, config.DisableOptimizations)
+		readOnlyDSN  = createDSN(databasePath, true, config.DisableOptimizations)
+	)
+
+	readWriteConn, err := sql.Open("sqlite3", readWriteDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open write connection: %w", err)
 	}
@@ -76,7 +106,7 @@ func NewDB(config Config) (*DB, error) {
 	readWriteConn.SetMaxIdleConns(1)
 	readWriteConn.SetMaxOpenConns(1)
 
-	readOnlyConn, err := sql.Open("sqlite3", databasePath)
+	readOnlyConn, err := sql.Open("sqlite3", readOnlyDSN)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open read connection: %w", err)
 	}
@@ -94,32 +124,11 @@ func NewDB(config Config) (*DB, error) {
 		transactionsMutex: sync.Mutex{},
 		writeChan:         make(chan writeTask),
 	}
-	if !config.DisableOptimizations {
-		if err := db.runStartupOptimizations(); err != nil {
-			return nil, fmt.Errorf("failed to run startup optimizations: %w", err)
-		}
-	}
 
 	db.wg.Add(1)
 	go db.processWriteChan()
 
 	return db, nil
-}
-
-// runStartupOptimizations runs the startup optimizations for the underlying
-// SQLite database.
-func (db *DB) runStartupOptimizations() error {
-	_, err := db.readWriteConn.Exec("PRAGMA journal_mode = WAL")
-	if err != nil {
-		return fmt.Errorf("failed to set journal mode: %w", err)
-	}
-
-	_, err = db.readWriteConn.Exec("PRAGMA synchronous = NORMAL")
-	if err != nil {
-		return fmt.Errorf("failed to set synchronous mode: %w", err)
-	}
-
-	return nil
 }
 
 // processWriteChan processes all incoming write tasks one at a time.
