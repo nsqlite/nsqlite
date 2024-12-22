@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/nsqlite/nsqlite/cmd/nsqlited/config"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/config"
 )
 
 func main() {
