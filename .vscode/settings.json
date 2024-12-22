@@ -1,0 +1,31 @@
+{
+  /////
+  // Editor settings
+  /////
+  "editor.formatOnSave": true,
+  "editor.foldingStrategy": "indentation",
+  "editor.rulers": [
+    80
+  ],
+  "files.eol": "\n",
+  /////
+  // Language specific settings
+  /////
+  "[json]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "vscode.markdown-language-features"
+  },
+  // Go & Golangci-lint
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
+  "go.lintTool": "golangci-lint",
+  "go.lintFlags": [
+    "--fast"
+  ]
+}
