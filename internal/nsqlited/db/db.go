@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -112,8 +113,14 @@ func createDSN(
 
 // NewDB creates a new DB instance.
 func NewDB(config Config) (*DB, error) {
+	if config.Directory == "" {
+		return nil, errors.New("database directory is required")
+	}
 	if err := os.MkdirAll(config.Directory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+	if config.TransactionIdleTimeout <= 0 {
+		return nil, errors.New("transaction idle timeout must be provided")
 	}
 
 	statsFilePath := path.Join(config.Directory, "stats.json")
@@ -231,7 +238,7 @@ func (db *DB) runStatsSync() {
 // monitorIdleTransactions rolls back transactions not used within the timeout.
 func (db *DB) monitorIdleTransactions(timeout time.Duration) {
 	defer db.wg.Done()
-	ticker := time.NewTicker(timeout / 2)
+	ticker := time.NewTicker(timeout)
 	defer ticker.Stop()
 
 	for {
