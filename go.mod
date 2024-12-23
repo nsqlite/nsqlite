@@ -5,6 +5,7 @@ go 1.23.2
 require (
 	github.com/alexflint/go-arg v1.5.1
 	github.com/google/uuid v1.6.0
+	github.com/matthewhartstonge/argon2 v1.1.1
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/orsinium-labs/enum v1.4.0
 	github.com/stretchr/testify v1.10.0
