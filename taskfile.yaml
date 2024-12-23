@@ -8,6 +8,7 @@ tasks:
   dev:
     desc: Build and serve NSQLite Server with hot reload
     watch: true
+    method: timestamp
     sources:
       - "**/*.go"
       - exclude: "./.git/**"
