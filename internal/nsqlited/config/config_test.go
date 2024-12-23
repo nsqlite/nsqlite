@@ -125,7 +125,7 @@ func Test_validateAuthAlgorithm(t *testing.T) {
 		},
 		{
 			name:      "valid - sha256",
-			algorithm: "sha256",
+			algorithm: "argon2",
 			wantErr:   false,
 		},
 		{
