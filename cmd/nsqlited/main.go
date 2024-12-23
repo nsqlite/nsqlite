@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 
-	"github.com/nsqlite/nsqlite/internal/nsqlited/config"
+	"github.com/nsqlite/nsqlite/internal/nsqlited"
 )
 
 func main() {
-	cfg := config.MustParse(os.Args)
-	ctx := context.Background()
-	if err := run(ctx, cfg); err != nil {
+	if err := nsqlited.Run(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 }
