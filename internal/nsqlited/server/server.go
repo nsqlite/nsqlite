@@ -8,6 +8,7 @@ import (
 
 	"github.com/nsqlite/nsqlite/internal/log"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
+	"github.com/nsqlite/nsqlite/internal/util/httputil"
 )
 
 // Config represents the configuration for a NSQLite server.
@@ -20,14 +21,16 @@ type Config struct {
 	ListenHost string
 	// ListenPort is the port to listen on.
 	ListenPort string
+	// AuthTokenAlgorithm is the algorithm to use for the auth token.
+	AuthTokenAlgorithm string
+	// AuthToken is the auth token to use.
+	AuthToken string
 }
 
 // Server is the server for NSQLite.
 type Server struct {
+	conf          Config
 	isInitialized bool
-	logger        log.Logger
-	listenHost    string
-	listenPort    string
 	server        http.Server
 }
 
@@ -39,12 +42,13 @@ func NewServer(config Config) (*Server, error) {
 	if config.ListenPort == "" {
 		config.ListenPort = "9876"
 	}
+	if config.AuthTokenAlgorithm == "" {
+		config.AuthTokenAlgorithm = "plaintext"
+	}
 
 	s := Server{
+		conf:          config,
 		isInitialized: true,
-		logger:        config.Logger,
-		listenHost:    config.ListenHost,
-		listenPort:    config.ListenPort,
 		server:        http.Server{},
 	}
 	return &s, nil
@@ -55,20 +59,30 @@ func (s *Server) IsInitialized() bool {
 	return s.isInitialized
 }
 
-// Start starts the server.
-func (s *Server) Start() error {
+// createMux creates the HTTP mux for the server.
+func (s *Server) createMux() *http.ServeMux {
+	buildHandler := httputil.CreateHandlerFuncBuilder(s.errorHandler)
 	mux := http.NewServeMux()
 
-	addr := fmt.Sprintf("%s:%s", s.listenHost, s.listenPort)
-	localAddr := fmt.Sprintf("http://%s:%s", "localhost", s.listenPort)
+	mux.HandleFunc("/health", buildHandler(s.healthHandler))
+	mux.HandleFunc("POST /query", buildHandler(s.queryHandler, s.queryHandlerAuthMiddleware))
+
+	return mux
+}
+
+// Start starts the server.
+func (s *Server) Start() error {
+	mux := s.createMux()
+	addr := fmt.Sprintf("%s:%s", s.conf.ListenHost, s.conf.ListenPort)
+	localAddr := fmt.Sprintf("http://%s:%s", "localhost", s.conf.ListenPort)
 	s.server = http.Server{
 		Addr:    addr,
 		Handler: mux,
 	}
 
-	s.logger.InfoNs(log.NsServer, "server started at "+localAddr, log.KV{
-		"listen_host": s.listenHost,
-		"listen_port": s.listenPort,
+	s.conf.Logger.InfoNs(log.NsServer, "server started at "+localAddr, log.KV{
+		"listen_host": s.conf.ListenHost,
+		"listen_port": s.conf.ListenPort,
 	})
 
 	err := s.server.ListenAndServe()
