@@ -39,10 +39,12 @@ func Run(ctx context.Context) error {
 	}()
 
 	serv, err := server.NewServer(server.Config{
-		Logger:     logger,
-		Db:         dbInstance,
-		ListenHost: conf.ListenHost,
-		ListenPort: conf.ListenPort,
+		Logger:             logger,
+		Db:                 dbInstance,
+		ListenHost:         conf.ListenHost,
+		ListenPort:         conf.ListenPort,
+		AuthTokenAlgorithm: conf.AuthTokenAlgorithm,
+		AuthToken:          conf.AuthToken,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating server: %w", err)
