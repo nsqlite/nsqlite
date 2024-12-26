@@ -37,6 +37,8 @@ type Config struct {
 
 // DB represents the SQLite integration for NSQLite.
 type DB struct {
+	Config
+
 	isInitialized           bool
 	readWriteConn           *sql.DB
 	readOnlyConn            *sql.DB
@@ -93,15 +95,15 @@ type WriteResult struct {
 type ReadResult struct {
 	Columns []string
 	Types   []string
-	Values  [][]any
+	Values  *[][]any
 }
 
 // QueryResult represents the result of a query.
 type QueryResult struct {
 	Type        queryType
 	TxId        string
-	WriteResult *WriteResult
-	ReadResult  *ReadResult
+	WriteResult WriteResult
+	ReadResult  ReadResult
 }
 
 func createDSN(
@@ -172,6 +174,8 @@ func NewDB(config Config) (*DB, error) {
 	readOnlyConn.SetMaxIdleConns(5)
 
 	db := &DB{
+		Config: config,
+
 		isInitialized:           true,
 		readWriteConn:           readWriteConn,
 		readOnlyConn:            readOnlyConn,
@@ -353,7 +357,7 @@ func (db *DB) processWriteChan() {
 		task.resultChan <- QueryResult{
 			TxId: task.query.TxId,
 			Type: QueryTypeWrite,
-			WriteResult: &WriteResult{
+			WriteResult: WriteResult{
 				LastInsertID: lastInsertId,
 				RowsAffected: rowsAffected,
 			},
@@ -591,15 +595,7 @@ func (db *DB) executeReadQuery(
 		return QueryResult{}, fmt.Errorf("failed to get columns: %w", err)
 	}
 
-	types, err := result.ColumnTypes()
-	if err != nil {
-		return QueryResult{}, fmt.Errorf("failed to get column types: %w", err)
-	}
-	typeNames := make([]string, len(types))
-	for i, t := range types {
-		typeNames[i] = strings.ToLower(t.DatabaseTypeName())
-	}
-
+	types, typesOk := []string{}, false
 	values := [][]any{}
 	for result.Next() {
 		row := make([]any, len(columns))
@@ -608,9 +604,16 @@ func (db *DB) executeReadQuery(
 			scans[i] = &row[i]
 		}
 
-		err = result.Scan(scans...)
-		if err != nil {
+		if err = result.Scan(scans...); err != nil {
 			return QueryResult{}, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		if !typesOk {
+			enhancedTypes, err := db.getColumnTypes(result, row)
+			if err != nil {
+				return QueryResult{}, fmt.Errorf("failed to get column types: %w", err)
+			}
+			types, typesOk = enhancedTypes, true
 		}
 
 		values = append(values, row)
@@ -620,12 +623,60 @@ func (db *DB) executeReadQuery(
 	return QueryResult{
 		TxId: query.TxId,
 		Type: QueryTypeRead,
-		ReadResult: &ReadResult{
+		ReadResult: ReadResult{
 			Columns: columns,
-			Types:   typeNames,
-			Values:  values,
+			Types:   types,
+			Values:  &values,
 		},
 	}, nil
+}
+
+// getColumnTypes returns the column types for a read query.
+//
+// It tryes to get the column types from the result, but if it has empty
+// types, it tries infering them from the first row following the SQLite
+// datatypes documentation https://www.sqlite.org/datatype3.html.
+func (db *DB) getColumnTypes(
+	result *sql.Rows, singleRow []any,
+) ([]string, error) {
+	types, err := result.ColumnTypes()
+	if err != nil {
+		return []string{}, fmt.Errorf("failed to get column types: %w", err)
+	}
+
+	typeNames := make([]string, len(types))
+	hasEmptyTypes := false
+	for i, t := range types {
+		typeNames[i] = strings.ToLower(t.DatabaseTypeName())
+		if typeNames[i] == "" {
+			hasEmptyTypes = true
+		}
+	}
+
+	if !hasEmptyTypes {
+		return typeNames, nil
+	}
+
+	for i := range typeNames {
+		if typeNames[i] != "" {
+			continue
+		}
+
+		switch singleRow[i].(type) {
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			typeNames[i] = "integer"
+		case float32, float64:
+			typeNames[i] = "real"
+		case []byte:
+			typeNames[i] = "blob"
+		case string:
+			typeNames[i] = "text"
+		default:
+			typeNames[i] = ""
+		}
+	}
+
+	return typeNames, nil
 }
 
 // GetStats returns the current DBStats. The persistent counters are loaded

@@ -86,10 +86,18 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		if res.Type == db.QueryTypeRead {
+			if res.ReadResult.Values == nil {
+				results = append(results, ErrorResult{
+					Error: "No rows returned",
+					Time:  time.Since(thisStart).Seconds(),
+				})
+				continue
+			}
+
 			results = append(results, ReadResult{
 				Columns: res.ReadResult.Columns,
 				Types:   res.ReadResult.Types,
-				Values:  res.ReadResult.Values,
+				Values:  *res.ReadResult.Values,
 				Time:    time.Since(thisStart).Seconds(),
 			})
 			continue
