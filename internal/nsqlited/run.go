@@ -11,6 +11,7 @@ import (
 	"github.com/nsqlite/nsqlite/internal/nsqlited/config"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/server"
+	"github.com/nsqlite/nsqlite/internal/version"
 )
 
 // Run runs the NSQLite server.
@@ -20,6 +21,7 @@ func Run(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	fmt.Println(version.ServerVersion())
 	logger := log.NewLogger(os.Stdout)
 	logger.Info("starting NSQLite server")
 
