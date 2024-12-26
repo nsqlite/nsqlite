@@ -8,26 +8,25 @@ tasks:
   dev:
     desc: Build and serve NSQLite Server with hot reload
     watch: true
-    method: timestamp
-    sources:
-      - "**/*.go"
-      - exclude: "./.git/**"
-      - exclude: "./temp/**"
-      - exclude: "./tmp/**"
-      - exclude: "./dist/**"
-      - exclude: "**/*_test.go"
-    deps:
-      - build
+    deps: [build]
     cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
   run:
     desc: Build and run NSQLite Server
-    deps:
-      - build
+    deps: [build]
     cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
   build:
     desc: Build NSQLite Server
+    sources:
+      - "**/*.go"
+      - exclude: ./.git/**
+      - exclude: ./temp/**
+      - exclude: ./tmp/**
+      - exclude: ./dist/**
+      - exclude: "**/*_test.go"
+    generates:
+      - ./dist/nsqlited
     cmds:
       - go build -o ./dist/nsqlited ./cmd/nsqlited/.
 
