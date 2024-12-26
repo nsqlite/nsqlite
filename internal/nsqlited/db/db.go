@@ -665,6 +665,8 @@ func (db *DB) getColumnTypes(
 			typeNames[i] = "integer"
 		case float32, float64:
 			typeNames[i] = "real"
+		case bool:
+			typeNames[i] = "boolean"
 		case []byte:
 			typeNames[i] = "blob"
 		case string:
