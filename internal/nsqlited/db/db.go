@@ -38,7 +38,6 @@ type Config struct {
 // DB represents the SQLite integration for NSQLite.
 type DB struct {
 	Config
-
 	isInitialized           bool
 	readWriteConn           *sql.DB
 	readOnlyConn            *sql.DB
@@ -174,8 +173,7 @@ func NewDB(config Config) (*DB, error) {
 	readOnlyConn.SetMaxIdleConns(5)
 
 	db := &DB{
-		Config: config,
-
+		Config:                  config,
 		isInitialized:           true,
 		readWriteConn:           readWriteConn,
 		readOnlyConn:            readOnlyConn,
