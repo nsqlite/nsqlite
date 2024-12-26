@@ -86,60 +86,19 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		if res.Type == db.QueryTypeRead {
-			func() {
-				defer res.ReadResult.Close()
-
-				columns, _ := res.ReadResult.Columns()
-				types, _ := res.ReadResult.ColumnTypes()
-				typeNames := make([]string, len(types))
-				for i, t := range types {
-					typeNames[i] = t.DatabaseTypeName()
-				}
-
-				values := [][]any{}
-				for res.ReadResult.Next() {
-					row := make([]any, len(columns))
-					scans := make([]any, len(columns))
-					for i := range scans {
-						scans[i] = &row[i]
-					}
-					_ = res.ReadResult.Scan(scans...)
-					values = append(values, row)
-				}
-
-				results = append(results, ReadResult{
-					Columns: columns,
-					Types:   typeNames,
-					Values:  values,
-					Time:    time.Since(thisStart).Seconds(),
-				})
-			}()
-
+			results = append(results, ReadResult{
+				Columns: res.ReadResult.Columns,
+				Types:   res.ReadResult.Types,
+				Values:  res.ReadResult.Values,
+				Time:    time.Since(thisStart).Seconds(),
+			})
 			continue
 		}
 
 		if res.Type == db.QueryTypeWrite {
-			lastInsertId, err := res.WriteResult.LastInsertId()
-			if err != nil {
-				results = append(results, ErrorResult{
-					Error: err.Error(),
-					Time:  time.Since(thisStart).Seconds(),
-				})
-				continue
-			}
-
-			rowsAffected, err := res.WriteResult.RowsAffected()
-			if err != nil {
-				results = append(results, ErrorResult{
-					Error: err.Error(),
-					Time:  time.Since(thisStart).Seconds(),
-				})
-				continue
-			}
-
 			results = append(results, WriteResult{
-				LastInsertID: lastInsertId,
-				RowsAffected: rowsAffected,
+				LastInsertID: res.WriteResult.LastInsertID,
+				RowsAffected: res.WriteResult.RowsAffected,
 				Time:         time.Since(thisStart).Seconds(),
 			})
 			continue

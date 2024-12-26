@@ -83,12 +83,25 @@ type Query struct {
 	Params []any
 }
 
+// WriteResult represents the result of a write query.
+type WriteResult struct {
+	LastInsertID int64
+	RowsAffected int64
+}
+
+// ReadResult represents the result of a read query.
+type ReadResult struct {
+	Columns []string
+	Types   []string
+	Values  [][]any
+}
+
 // QueryResult represents the result of a query.
 type QueryResult struct {
 	Type        queryType
 	TxId        string
-	WriteResult sql.Result
-	ReadResult  *sql.Rows
+	WriteResult *WriteResult
+	ReadResult  *ReadResult
 }
 
 func createDSN(
@@ -319,18 +332,31 @@ func (db *DB) processWriteChan() {
 		} else {
 			result, err = db.readWriteConn.Exec(task.query.Query, task.query.Params...)
 		}
-
 		if err != nil {
 			task.errorChan <- fmt.Errorf("failed to execute write query: %w", err)
 			continue
 		}
 
-		atomic.AddInt64(&db.stats.TotalWriteQueries, 1)
+		lastInsertId, err := result.LastInsertId()
+		if err != nil {
+			task.errorChan <- fmt.Errorf("failed to get last insert ID: %w", err)
+			continue
+		}
 
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			task.errorChan <- fmt.Errorf("failed to get rows affected: %w", err)
+			continue
+		}
+
+		atomic.AddInt64(&db.stats.TotalWriteQueries, 1)
 		task.resultChan <- QueryResult{
-			Type:        QueryTypeWrite,
-			WriteResult: result,
-			TxId:        task.query.TxId,
+			TxId: task.query.TxId,
+			Type: QueryTypeWrite,
+			WriteResult: &WriteResult{
+				LastInsertID: lastInsertId,
+				RowsAffected: rowsAffected,
+			},
 		}
 	}
 }
@@ -555,17 +581,50 @@ func (db *DB) executeReadQuery(
 	} else {
 		result, err = db.readOnlyConn.QueryContext(ctx, query.Query, query.Params...)
 	}
-
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to execute read query: %w", err)
 	}
+	defer result.Close()
+
+	columns, err := result.Columns()
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get columns: %w", err)
+	}
+
+	types, err := result.ColumnTypes()
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get column types: %w", err)
+	}
+	typeNames := make([]string, len(types))
+	for i, t := range types {
+		typeNames[i] = strings.ToLower(t.DatabaseTypeName())
+	}
+
+	values := [][]any{}
+	for result.Next() {
+		row := make([]any, len(columns))
+		scans := make([]any, len(columns))
+		for i := range scans {
+			scans[i] = &row[i]
+		}
+
+		err = result.Scan(scans...)
+		if err != nil {
+			return QueryResult{}, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		values = append(values, row)
+	}
 
 	atomic.AddInt64(&db.stats.TotalReadQueries, 1)
-
 	return QueryResult{
-		Type:       QueryTypeRead,
-		ReadResult: result,
-		TxId:       query.TxId,
+		TxId: query.TxId,
+		Type: QueryTypeRead,
+		ReadResult: &ReadResult{
+			Columns: columns,
+			Types:   typeNames,
+			Values:  values,
+		},
 	}, nil
 }
 
