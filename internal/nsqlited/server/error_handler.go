@@ -24,7 +24,7 @@ func (s *Server) errorHandler(
 		}
 
 		// Log the real error to the server logger.
-		s.conf.Logger.ErrorNs(
+		s.Logger.ErrorNs(
 			log.NsServer, "error while handling request", log.KV{
 				"id":      errorId,
 				"status":  err.HTTPStatus,
@@ -42,7 +42,7 @@ func (s *Server) errorHandler(
 			"message": safeMessage,
 		})
 	default:
-		s.conf.Logger.ErrorNs(
+		s.Logger.ErrorNs(
 			log.NsServer, "unknown error while handling request", log.KV{
 				"id":    errorId,
 				"error": err.Error(),

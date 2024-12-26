@@ -16,7 +16,7 @@ func (s *Server) queryHandlerAuthMiddleware(
 	next httputil.HandlerFuncErr,
 ) httputil.HandlerFuncErr {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		if s.conf.AuthToken == "" {
+		if s.AuthToken == "" {
 			return next(w, r)
 		}
 
@@ -33,20 +33,20 @@ func (s *Server) queryHandlerAuthMiddleware(
 			return unauthorized()
 		}
 
-		if s.conf.AuthTokenAlgorithm == "plaintext" {
-			if checkPlaintextAuth(clientAuthToken, s.conf.AuthToken) {
+		if s.AuthTokenAlgorithm == "plaintext" {
+			if checkPlaintextAuth(clientAuthToken, s.AuthToken) {
 				return next(w, r)
 			}
 		}
 
-		if s.conf.AuthTokenAlgorithm == "argon2" {
-			if checkArgon2Auth(clientAuthToken, s.conf.AuthToken) {
+		if s.AuthTokenAlgorithm == "argon2" {
+			if checkArgon2Auth(clientAuthToken, s.AuthToken) {
 				return next(w, r)
 			}
 		}
 
-		if s.conf.AuthTokenAlgorithm == "bcrypt" {
-			if checkBcryptAuth(clientAuthToken, s.conf.AuthToken) {
+		if s.AuthTokenAlgorithm == "bcrypt" {
+			if checkBcryptAuth(clientAuthToken, s.AuthToken) {
 				return next(w, r)
 			}
 		}

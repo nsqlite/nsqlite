@@ -29,7 +29,7 @@ type Config struct {
 
 // Server is the server for NSQLite.
 type Server struct {
-	conf          Config
+	Config
 	isInitialized bool
 	server        http.Server
 }
@@ -47,7 +47,7 @@ func NewServer(config Config) (*Server, error) {
 	}
 
 	s := Server{
-		conf:          config,
+		Config:        config,
 		isInitialized: true,
 		server:        http.Server{},
 	}
@@ -73,16 +73,16 @@ func (s *Server) createMux() *http.ServeMux {
 // Start starts the server.
 func (s *Server) Start() error {
 	mux := s.createMux()
-	addr := fmt.Sprintf("%s:%s", s.conf.ListenHost, s.conf.ListenPort)
-	localAddr := fmt.Sprintf("http://%s:%s", "localhost", s.conf.ListenPort)
+	addr := fmt.Sprintf("%s:%s", s.ListenHost, s.ListenPort)
+	localAddr := fmt.Sprintf("http://%s:%s", "localhost", s.ListenPort)
 	s.server = http.Server{
 		Addr:    addr,
 		Handler: mux,
 	}
 
-	s.conf.Logger.InfoNs(log.NsServer, "server started at "+localAddr, log.KV{
-		"listen_host": s.conf.ListenHost,
-		"listen_port": s.conf.ListenPort,
+	s.Logger.InfoNs(log.NsServer, "server started at "+localAddr, log.KV{
+		"listen_host": s.ListenHost,
+		"listen_port": s.ListenPort,
 	})
 
 	err := s.server.ListenAndServe()

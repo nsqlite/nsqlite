@@ -72,7 +72,7 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		thisStart := time.Now()
-		res, err := s.conf.Db.Query(ctx, db.Query{
+		res, err := s.Db.Query(ctx, db.Query{
 			TxId:   txId,
 			Query:  q.Query,
 			Params: q.Params,

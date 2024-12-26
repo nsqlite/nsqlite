@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) error {
-	_, err := s.conf.Db.Query(r.Context(), db.Query{
+	_, err := s.Db.Query(r.Context(), db.Query{
 		Query: "SELECT 1",
 	})
 	if err != nil {
