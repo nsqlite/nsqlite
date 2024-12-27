@@ -33,7 +33,6 @@ type ErrorResult struct {
 // Response represents the structure of an outgoing response.
 type Response struct {
 	Results []any   `json:"results"`
-	Error   string  `json:"error,omitempty"`
 	Time    float64 `json:"time"`
 }
 
