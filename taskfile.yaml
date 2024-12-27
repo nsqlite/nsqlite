@@ -12,6 +12,15 @@ tasks:
 
   buildc:
     desc: Build NSQLite CLI
+    sources:
+      - "**/*.go"
+      - exclude: ./.git/**
+      - exclude: ./temp/**
+      - exclude: ./tmp/**
+      - exclude: ./dist/**
+      - exclude: "**/*_test.go"
+    generates:
+      - ./dist/nsqlite
     cmd: go build -o ./dist/nsqlite ./cmd/nsqlite/.
 
   devs:
