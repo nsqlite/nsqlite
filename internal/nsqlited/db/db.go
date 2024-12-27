@@ -54,11 +54,11 @@ type DB struct {
 
 // DBStats holds counters and status info about DB usage.
 type DBStats struct {
-	TotalReadQueries     int64 `json:"total_read_queries"`
-	TotalWriteQueries    int64 `json:"total_write_queries"`
-	TotalBeginQueries    int64 `json:"total_begin_queries"`
-	TotalCommitQueries   int64 `json:"total_commit_queries"`
-	TotalRollbackQueries int64 `json:"total_rollback_queries"`
+	TotalReadQueries     int64 `json:"totalReadQueries"`
+	TotalWriteQueries    int64 `json:"totalWriteQueries"`
+	TotalBeginQueries    int64 `json:"totalBeginQueries"`
+	TotalCommitQueries   int64 `json:"totalCommitQueries"`
+	TotalRollbackQueries int64 `json:"totalRollbackQueries"`
 	TransactionsInFlight int64 `json:"-"` // Derived in real time, not persistent.
 	WriteQueueLength     int64 `json:"-"` // Derived in real time, not persistent.
 }

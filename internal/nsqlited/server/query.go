@@ -24,8 +24,8 @@ type Request struct {
 
 // WriteResult represents the structure of a write query result.
 type WriteResult struct {
-	LastInsertID int64   `json:"last_insert_id"`
-	RowsAffected int64   `json:"rows_affected"`
+	LastInsertID int64   `json:"lastInsertId"`
+	RowsAffected int64   `json:"rowsAffected"`
 	Time         float64 `json:"time"`
 }
 
