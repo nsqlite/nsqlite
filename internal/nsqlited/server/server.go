@@ -65,6 +65,7 @@ func (s *Server) createMux() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", buildHandler(s.healthHandler))
+	mux.HandleFunc("GET /version", buildHandler(s.versionHandler, s.queryHandlerAuthMiddleware))
 	mux.HandleFunc("GET /stats", buildHandler(s.statsHandler, s.queryHandlerAuthMiddleware))
 	mux.HandleFunc("POST /query", buildHandler(s.queryHandler, s.queryHandlerAuthMiddleware))
 
