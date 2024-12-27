@@ -24,6 +24,19 @@ type ReadResult struct {
 	Time    float64  `json:"time"`
 }
 
+// TxResult represents the structure of a transaction operation result.
+type TxResult struct {
+	TxId    string  `json:"txId"`
+	Message string  `json:"message"`
+	Time    float64 `json:"time"`
+}
+
+// SuccessResult represents a generic success result.
+type SuccessResult struct {
+	Message string  `json:"message"`
+	Time    float64 `json:"time"`
+}
+
 // ErrorResult represents the structure of an error result.
 type ErrorResult struct {
 	Error string  `json:"error"`
@@ -109,6 +122,38 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 			})
 			continue
 		}
+
+		if res.Type == db.QueryTypeBegin {
+			results = append(results, TxResult{
+				TxId:    res.TxId,
+				Message: "Tx started",
+				Time:    time.Since(thisStart).Seconds(),
+			})
+			continue
+		}
+
+		if res.Type == db.QueryTypeCommit {
+			results = append(results, TxResult{
+				TxId:    res.TxId,
+				Message: "Tx committed",
+				Time:    time.Since(thisStart).Seconds(),
+			})
+			continue
+		}
+
+		if res.Type == db.QueryTypeRollback {
+			results = append(results, TxResult{
+				TxId:    res.TxId,
+				Message: "Tx rolled back",
+				Time:    time.Since(thisStart).Seconds(),
+			})
+			continue
+		}
+
+		results = append(results, SuccessResult{
+			Message: "Ok",
+			Time:    time.Since(thisStart).Seconds(),
+		})
 	}
 
 	return httputil.WriteJSON(w, http.StatusOK, Response{
