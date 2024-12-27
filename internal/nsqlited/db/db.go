@@ -69,19 +69,19 @@ type transactionData struct {
 	lastUsed time.Time
 }
 
+// Query represents a query to be executed.
+type Query struct {
+	TxId   string
+	Query  string
+	Params []any
+}
+
 // writeTask holds the info needed to process a single write request.
 type writeTask struct {
 	ctx        context.Context
 	query      Query
 	resultChan chan QueryResult
 	errorChan  chan error
-}
-
-// Query represents a query to be executed.
-type Query struct {
-	TxId   string
-	Query  string
-	Params []any
 }
 
 // WriteResult represents the result of a write query.
