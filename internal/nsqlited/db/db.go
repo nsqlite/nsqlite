@@ -364,7 +364,7 @@ func (db *DB) processWriteChan() {
 }
 
 // queryType represents the type of a given SQLite query.
-type queryType = enum.Member[string]
+type queryType enum.Member[string]
 
 var (
 	QueryTypeUnknown  = queryType{Value: "unknown"}
