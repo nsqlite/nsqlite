@@ -1,26 +1,13 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
 	"github.com/nsqlite/nsqlite/internal/util/httputil"
+	"github.com/nsqlite/nsqlite/internal/validate"
 )
-
-// Query represents a single query within a request.
-type Query struct {
-	TxId   string `json:"txId,omitempty"`
-	Query  string `json:"query"`
-	Params []any  `json:"params"`
-}
-
-// Request represents the structure of an incoming request.
-type Request struct {
-	TxId    string  `json:"txId,omitempty"`
-	Queries []Query `json:"queries"`
-}
 
 // WriteResult represents the structure of a write query result.
 type WriteResult struct {
@@ -55,25 +42,37 @@ type Response struct {
 func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
-	req := Request{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	contentType := r.Header.Get("Content-Type")
+	isContentTypeValid := validate.ContentType(
+		contentType, validate.ContentTypeJSON, validate.ContentTypePlainText,
+	)
+	if !isContentTypeValid {
 		return httputil.NewJSONError(
-			http.StatusBadRequest, err, "Invalid request format",
+			http.StatusBadRequest, nil, "Invalid content type",
+		)
+	}
+
+	body, err := httputil.ReadReqBodyBytes(r)
+	if err != nil {
+		return httputil.NewJSONError(
+			http.StatusBadRequest, err, "Failed to read request body",
+		)
+	}
+
+	queries, err := queryParseRequest(contentType, body)
+	if err != nil {
+		return httputil.NewJSONError(
+			http.StatusBadRequest, err, "Failed to parse request body, "+err.Error(),
 		)
 	}
 
 	allStart := time.Now()
 	results := []any{}
 
-	for _, q := range req.Queries {
-		txId := req.TxId
-		if q.TxId != "" {
-			txId = q.TxId
-		}
-
+	for _, q := range queries {
 		thisStart := time.Now()
 		res, err := s.Db.Query(ctx, db.Query{
-			TxId:   txId,
+			TxId:   q.TxId,
 			Query:  q.Query,
 			Params: q.Params,
 		})
