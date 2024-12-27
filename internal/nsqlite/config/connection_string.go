@@ -8,20 +8,30 @@ import (
 // ConnectionString represents the connection string for the NSQLite
 // database server.
 type ConnectionString struct {
-	Protocol  string
-	Host      string
-	Port      string
-	AuthToken string
+	protocol  string
+	host      string
+	port      string
+	authToken string
 }
 
 // String returns the string representation of the connection string without
 // the auth token.
 func (c ConnectionString) String() string {
-	if c.AuthToken == "" {
-		return c.Protocol + "://" + c.Host + ":" + c.Port
+	if c.authToken == "" {
+		return c.protocol + "://" + c.host + ":" + c.port
 	}
 
-	return c.Protocol + "://" + c.Host + ":" + c.Port + "?authToken=****"
+	return c.protocol + "://" + c.host + ":" + c.port + "?authToken=****"
+}
+
+// URL returns the URL of the connection string without the auth token.
+func (c ConnectionString) URL() string {
+	return c.protocol + "://" + c.host + ":" + c.port
+}
+
+// AuthToken returns the auth token of the connection string.
+func (c ConnectionString) AuthToken() string {
+	return c.authToken
 }
 
 // parseConnectionString parses the given connection string and returns
@@ -39,9 +49,9 @@ func parseConnectionString(connectionString string) (ConnectionString, error) {
 
 	host, port := parsedURL.Hostname(), parsedURL.Port()
 	return ConnectionString{
-		Protocol:  protocol,
-		Host:      host,
-		Port:      port,
-		AuthToken: parsedURL.Query().Get("authToken"),
+		protocol:  protocol,
+		host:      host,
+		port:      port,
+		authToken: parsedURL.Query().Get("authToken"),
 	}, nil
 }
