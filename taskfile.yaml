@@ -5,18 +5,27 @@ version: "3"
 interval: 500ms
 
 tasks:
-  dev:
+  runc:
+    desc: Build an run NSQLite CLI
+    deps: [buildc]
+    cmd: ./dist/nsqlite {{.CLI_ARGS}}
+
+  buildc:
+    desc: Build NSQLite CLI
+    cmd: go build -o ./dist/nsqlite ./cmd/nsqlite/.
+
+  devs:
     desc: Build and serve NSQLite Server with hot reload
     watch: true
-    deps: [build]
+    deps: [builds]
     cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
-  run:
+  runs:
     desc: Build and run NSQLite Server
-    deps: [build]
+    deps: [builds]
     cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
-  build:
+  builds:
     desc: Build NSQLite Server
     sources:
       - "**/*.go"
@@ -27,8 +36,7 @@ tasks:
       - exclude: "**/*_test.go"
     generates:
       - ./dist/nsqlited
-    cmds:
-      - go build -o ./dist/nsqlited ./cmd/nsqlited/.
+    cmd: go build -o ./dist/nsqlited ./cmd/nsqlited/.
 
   test:
     desc: Run tests
