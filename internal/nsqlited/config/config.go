@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/alexflint/go-arg"
+	"github.com/nsqlite/nsqlite/internal/validate"
 	"github.com/nsqlite/nsqlite/internal/version"
 )
 
@@ -42,12 +42,12 @@ func MustParse(args []string) Config {
 	}
 	parser.MustParse(args[1:])
 
-	if err := validateListenHost(cfg.ListenHost); err != nil {
-		log.Fatal(err)
+	if !validate.ListenHost(cfg.ListenHost) {
+		log.Fatal("invalid listen address")
 	}
 
-	if err := validateListenPort(cfg.ListenPort); err != nil {
-		log.Fatal(err)
+	if !validate.Port(cfg.ListenPort) {
+		log.Fatal("invalid listen port, valid values are 1-65535")
 	}
 
 	if err := validateAuthTokenAlgorithm(cfg.AuthTokenAlgorithm); err != nil {
@@ -59,24 +59,6 @@ func MustParse(args []string) Config {
 	}
 
 	return cfg
-}
-
-// validateListenHost validates if addr is a valid ip address.
-func validateListenHost(addr string) error {
-	re := regexp.MustCompile(`^([0-9]{1,3}\.){3}[0-9]{1,3}($|/[0-9]{2})$`)
-	if !re.MatchString(addr) {
-		return errors.New("invalid listen address")
-	}
-	return nil
-}
-
-// validateListenPort validates if port is a valid port number.
-func validateListenPort(port string) error {
-	re := regexp.MustCompile(`^\d{1,5}$`)
-	if !re.MatchString(port) {
-		return errors.New("invalid listen port, valid values are 1-65535")
-	}
-	return nil
 }
 
 // validateAuthTokenAlgorithm validates if algorithm is a valid auth algorithm.
