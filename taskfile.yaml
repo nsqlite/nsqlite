@@ -14,6 +14,7 @@ tasks:
     desc: Build NSQLite CLI
     sources:
       - "**/*.go"
+      - exclude: ./internal/nsqlited/**
       - exclude: ./.git/**
       - exclude: ./temp/**
       - exclude: ./tmp/**
@@ -38,6 +39,7 @@ tasks:
     desc: Build NSQLite Server
     sources:
       - "**/*.go"
+      - exclude: ./internal/nsqlite/**
       - exclude: ./.git/**
       - exclude: ./temp/**
       - exclude: ./tmp/**
