@@ -3,7 +3,7 @@ package version
 import "fmt"
 
 const (
-	version = "v0.0.1"
+	Version = "v0.0.1"
 
 	colorReset      = "\033[0m"
 	colorRed        = "\033[31m"
@@ -30,7 +30,7 @@ func asciiArtTpl() string {
   /  |/ /\__ \/ / / / / /   / / __/ _ \
  / /|  /___/ / /_/ / / /___/ / /_/  __/
 /_/ |_//____/\___\_\/_____/_/\__/\___/
-%s ` + version + `
+%s ` + Version + `
 For more information visit https://github.com/nsqlite/nsqlite and if you like the project, please leave a star on GitHub.`
 
 	asciiArt = asciiArt[1:]                          // This just removes the first newline character
@@ -46,5 +46,5 @@ func ServerVersion() string {
 
 // ClientVersion returns the client version of nsqlite.
 func ClientVersion() string {
-	return fmt.Sprintf(asciiArtTpl(), "Client")
+	return fmt.Sprintf(asciiArtTpl(), "CLI")
 }
