@@ -6,9 +6,11 @@ require (
 	github.com/alexflint/go-arg v1.5.1
 	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
+	github.com/logrusorgru/aurora/v4 v4.0.0
 	github.com/matthewhartstonge/argon2 v1.1.1
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/orsinium-labs/enum v1.4.0
+	github.com/peterh/liner v1.2.2
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.31.0
 )
