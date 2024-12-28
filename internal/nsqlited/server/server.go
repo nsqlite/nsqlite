@@ -64,6 +64,10 @@ func (s *Server) createMux() *http.ServeMux {
 	buildHandler := httputil.CreateHandlerFuncBuilder(s.errorHandler)
 	mux := http.NewServeMux()
 
+	headerAuthMws := []httputil.Middleware{
+		s.queryHandlerAuthMiddleware,
+	}
+
 	routes := []struct {
 		pattern     string
 		handler     httputil.HandlerFuncErr
@@ -74,25 +78,19 @@ func (s *Server) createMux() *http.ServeMux {
 			handler: s.healthHandler,
 		},
 		{
-			pattern: "/version",
-			handler: s.versionHandler,
-			middlewares: []httputil.Middleware{
-				s.queryHandlerAuthMiddleware,
-			},
+			pattern:     "/version",
+			handler:     s.versionHandler,
+			middlewares: headerAuthMws,
 		},
 		{
-			pattern: "/stats",
-			handler: s.statsHandler,
-			middlewares: []httputil.Middleware{
-				s.queryHandlerAuthMiddleware,
-			},
+			pattern:     "/stats",
+			handler:     s.statsHandler,
+			middlewares: headerAuthMws,
 		},
 		{
-			pattern: "/query",
-			handler: s.queryHandler,
-			middlewares: []httputil.Middleware{
-				s.queryHandlerAuthMiddleware,
-			},
+			pattern:     "/query",
+			handler:     s.queryHandler,
+			middlewares: headerAuthMws,
 		},
 	}
 
