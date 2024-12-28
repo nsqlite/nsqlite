@@ -31,7 +31,7 @@ func asciiArtTpl() string {
  / /|  /___/ / /_/ / / /___/ / /_/  __/
 /_/ |_//____/\___\_\/_____/_/\__/\___/
 %s ` + Version + `
-For more information visit https://github.com/nsqlite/nsqlite and if you like the project, please leave a star on GitHub.`
+For more information visit https://github.com/nsqlite/nsqlite and please leave a star`
 
 	asciiArt = asciiArt[1:]                          // This just removes the first newline character
 	asciiArt = colorCyanBold + asciiArt + colorReset // Add color to the ASCII art
