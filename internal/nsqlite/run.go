@@ -7,11 +7,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/nsqlite/nsqlite/internal/nsqlite/client"
 	"github.com/nsqlite/nsqlite/internal/nsqlite/config"
+	"github.com/nsqlite/nsqlite/internal/nsqlite/repl"
 	"github.com/nsqlite/nsqlite/internal/version"
 )
 
-// Run runs the NSQLite server.
+// Run runs the NSQLite CLI.
 func Run(ctx context.Context) error {
 	conf := config.MustParse(os.Args)
 
@@ -19,7 +21,16 @@ func Run(ctx context.Context) error {
 	defer stop()
 
 	fmt.Println(version.ClientVersion())
-	fmt.Println("Connecting to", conf.ParsedConnectionString.String())
+
+	clientInst := client.NewClient(conf.ParsedConnectionString)
+	rp := repl.NewRepl(ctx, stop, conf, clientInst)
+	defer rp.Shutdown()
+	go func() {
+		if err := rp.Start(); err != nil {
+			fmt.Println(err)
+			stop()
+		}
+	}()
 
 	<-ctx.Done()
 	fmt.Printf("\nGoodbye!\n\n")
