@@ -11,13 +11,7 @@ func cmdQuery(r *Repl, input string) {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
 	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color = table.ColorOptions{
-		Header:       text.Colors{text.FgHiWhite, text.Bold},
-		IndexColumn:  text.Colors{text.FgWhite},
-		Row:          text.Colors{text.FgWhite},
-		RowAlternate: text.Colors{text.FgWhite},
-		Footer:       text.Colors{text.FgWhite},
-	}
+	tw.Style().Color.Header = text.Colors{text.FgHiWhite, text.Bold}
 
 	res, err := r.clientInst.SendQuery(input, r.txId)
 	if err != nil && res.Error == "" {
