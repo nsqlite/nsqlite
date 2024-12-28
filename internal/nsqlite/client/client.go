@@ -87,10 +87,15 @@ type SendQueryResponse struct {
 }
 
 // SendQuery sends a query to the remote server and returns the response.
-func (c *Client) SendQuery(query string) (SendQueryResponse, error) {
+//
+// If non empty, txId is used to send the query in the context of a transaction.
+func (c *Client) SendQuery(query, txId string) (SendQueryResponse, error) {
 	res := SendQueryResponse{}
 	body := map[string]string{
 		"query": query,
+	}
+	if txId != "" {
+		body["txId"] = txId
 	}
 
 	hres, err := c.httpClient.Post(PostParams{

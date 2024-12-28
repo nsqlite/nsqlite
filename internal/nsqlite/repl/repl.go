@@ -19,6 +19,7 @@ type Repl struct {
 	ctx        context.Context
 	stop       context.CancelFunc
 	reader     *bufio.Reader
+	txId       string
 }
 
 func NewRepl(
@@ -108,6 +109,12 @@ func (r *Repl) Shutdown() {
 	r.stop()
 }
 
+// setTxId sets the current transaction ID for the REPL. Send empty string to
+// reset the transaction ID.
+func (r *Repl) setTxId(txId string) {
+	r.txId = txId
+}
+
 // cleanError removes the unwanted text from the error message. So, the error
 // is more readable.
 func (r *Repl) cleanError(errStr string) string {
@@ -119,8 +126,15 @@ func (r *Repl) cleanError(errStr string) string {
 // prompt shows the prompt and reads the input from the user.
 func (r *Repl) prompt() string {
 	label := "NSQLite> "
-	fmt.Print(label)
+	if r.txId != "" {
+		txId := r.txId
+		if len(txId) > 7 {
+			txId = txId[len(txId)-7:]
+		}
+		label = fmt.Sprintf("NSQLite(%s)> ", txId)
+	}
 
+	fmt.Print(label)
 	text, _ := r.reader.ReadString('\n')
 	return strings.TrimSpace(text)
 }

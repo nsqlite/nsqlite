@@ -19,7 +19,7 @@ func cmdQuery(r *Repl, input string) {
 		Footer:       text.Colors{text.FgWhite},
 	}
 
-	res, err := r.clientInst.SendQuery(input)
+	res, err := r.clientInst.SendQuery(input, r.txId)
 	if err != nil && res.Error == "" {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{err.Error()})
@@ -28,6 +28,35 @@ func cmdQuery(r *Repl, input string) {
 	if res.Type == "error" {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{r.cleanError(res.Error)})
+	}
+
+	if res.Type == "ok" {
+		tw.AppendHeader(table.Row{"OK"})
+		tw.AppendRow(table.Row{"OK"})
+	}
+
+	if res.Type == "begin" {
+		if res.TxId == "" {
+			tw.AppendHeader(table.Row{"Error"})
+			tw.AppendRow(table.Row{"No transaction ID returned"})
+		}
+		if res.TxId != "" {
+			r.setTxId(res.TxId)
+			tw.AppendHeader(table.Row{"OK"})
+			tw.AppendRow(table.Row{"Transaction started"})
+		}
+	}
+
+	if res.Type == "commit" {
+		r.setTxId("")
+		tw.AppendHeader(table.Row{"OK"})
+		tw.AppendRow(table.Row{"Transaction committed"})
+	}
+
+	if res.Type == "rollback" {
+		r.setTxId("")
+		tw.AppendHeader(table.Row{"OK"})
+		tw.AppendRow(table.Row{"Transaction rolled back"})
 	}
 
 	if res.Type == "write" {
