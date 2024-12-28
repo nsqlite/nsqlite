@@ -97,7 +97,6 @@ func (s *Server) createMux() *http.ServeMux {
 	setResponseHeaders := func(next httputil.HandlerFuncErr) httputil.HandlerFuncErr {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Set("x-server", "NSQLite")
-			w.Header().Set("x-nsqlite", "true")
 			return next(w, r)
 		}
 	}
