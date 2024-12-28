@@ -5,21 +5,24 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/nsqlite/nsqlite/internal/nsqlite/client"
 	"github.com/nsqlite/nsqlite/internal/nsqlite/config"
 	"github.com/nsqlite/nsqlite/internal/util/sysutil"
 	"github.com/nsqlite/nsqlite/internal/version"
+	"github.com/peterh/liner"
 )
 
 type Repl struct {
-	conf       config.Config
-	clientInst client.Client
-	ctx        context.Context
-	stop       context.CancelFunc
-	reader     *bufio.Reader
-	txId       string
+	conf        config.Config
+	clientInst  client.Client
+	ctx         context.Context
+	stop        context.CancelFunc
+	reader      *bufio.Reader
+	txId        string
+	historyPath string
 }
 
 func NewRepl(
@@ -29,11 +32,12 @@ func NewRepl(
 	clientInst client.Client,
 ) Repl {
 	return Repl{
-		conf:       conf,
-		clientInst: clientInst,
-		ctx:        ctx,
-		stop:       stop,
-		reader:     bufio.NewReader(os.Stdin),
+		conf:        conf,
+		clientInst:  clientInst,
+		ctx:         ctx,
+		stop:        stop,
+		reader:      bufio.NewReader(os.Stdin),
+		historyPath: filepath.Join(os.TempDir(), ".nsqlite_history"),
 	}
 }
 
@@ -74,17 +78,17 @@ func (r *Repl) Start() error {
 				continue
 			}
 
-			if input == ".exit" || input == ".quit" {
+			if input == "exit" || input == ".exit" || input == ".quit" {
 				r.Shutdown()
 				return nil
 			}
 
-			if input == ".clear" || input == "clear" {
+			if input == "clear" || input == ".clear" {
 				sysutil.ClearTerminal()
 				continue
 			}
 
-			if input == ".help" {
+			if input == "help" || input == ".help" {
 				cmdHelp()
 				continue
 			}
@@ -134,7 +138,32 @@ func (r *Repl) prompt() string {
 		label = fmt.Sprintf("NSQLite(%s)> ", txId)
 	}
 
-	fmt.Print(label)
-	text, _ := r.reader.ReadString('\n')
-	return strings.TrimSpace(text)
+	line := liner.NewLiner()
+	defer line.Close()
+	line.SetCtrlCAborts(true)
+	line.SetCompleter(cmdHelpCompleter)
+
+	if file, err := os.Open(r.historyPath); err == nil {
+		_, _ = line.ReadHistory(file)
+		file.Close()
+	} else {
+		fmt.Println("No previous history.", err)
+	}
+
+	prompt, err := line.Prompt(label)
+	if err != nil {
+		if err == liner.ErrPromptAborted {
+			fmt.Println("CTRL+C pressed, exiting...")
+			return ".quit"
+		}
+		return ""
+	}
+
+	line.AppendHistory(prompt)
+	if file, err := os.Create(r.historyPath); err == nil {
+		_, _ = line.WriteHistory(file)
+		file.Close()
+	}
+
+	return strings.TrimSpace(prompt)
 }
