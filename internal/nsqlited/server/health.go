@@ -17,5 +17,5 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) error {
 		)
 	}
 
-	return httputil.WriteString(w, http.StatusOK, "NSQLite OK")
+	return httputil.WriteString(w, http.StatusOK, "OK")
 }

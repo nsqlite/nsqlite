@@ -64,10 +64,52 @@ func (s *Server) createMux() *http.ServeMux {
 	buildHandler := httputil.CreateHandlerFuncBuilder(s.errorHandler)
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", buildHandler(s.healthHandler))
-	mux.HandleFunc("GET /version", buildHandler(s.versionHandler, s.queryHandlerAuthMiddleware))
-	mux.HandleFunc("GET /stats", buildHandler(s.statsHandler, s.queryHandlerAuthMiddleware))
-	mux.HandleFunc("POST /query", buildHandler(s.queryHandler, s.queryHandlerAuthMiddleware))
+	routes := []struct {
+		pattern     string
+		handler     httputil.HandlerFuncErr
+		middlewares []httputil.Middleware
+	}{
+		{
+			pattern: "/health",
+			handler: s.healthHandler,
+		},
+		{
+			pattern: "/version",
+			handler: s.versionHandler,
+			middlewares: []httputil.Middleware{
+				s.queryHandlerAuthMiddleware,
+			},
+		},
+		{
+			pattern: "/stats",
+			handler: s.statsHandler,
+			middlewares: []httputil.Middleware{
+				s.queryHandlerAuthMiddleware,
+			},
+		},
+		{
+			pattern: "/query",
+			handler: s.queryHandler,
+			middlewares: []httputil.Middleware{
+				s.queryHandlerAuthMiddleware,
+			},
+		},
+	}
+
+	setResponseHeaders := func(next httputil.HandlerFuncErr) httputil.HandlerFuncErr {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			w.Header().Set("x-server", "NSQLite")
+			w.Header().Set("x-nsqlite", "true")
+			return next(w, r)
+		}
+	}
+
+	for _, route := range routes {
+		route.middlewares = append(route.middlewares, setResponseHeaders)
+		mux.HandleFunc(
+			route.pattern, buildHandler(route.handler, route.middlewares...),
+		)
+	}
 
 	return mux
 }
