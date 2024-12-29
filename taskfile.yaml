@@ -5,6 +5,12 @@ version: "3"
 interval: 500ms
 
 tasks:
+  install:
+    desc: Build and install binaries in local system using go install
+    cmds:
+      - go install ./cmd/nsqlite/.
+      - go install ./cmd/nsqlited/.
+
   runc:
     desc: Build an run NSQLite CLI
     deps: [buildc]
