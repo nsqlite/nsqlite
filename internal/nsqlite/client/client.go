@@ -61,6 +61,14 @@ func (c *Client) RemoteVersion() (string, bool, error) {
 		return "", false, fmt.Errorf("failed to get remote NSQLite server version: %w", err)
 	}
 
+	if res.Status == http.StatusUnauthorized {
+		return "", false, fmt.Errorf("authentication failed, please check your credentials")
+	}
+
+	if res.Status != http.StatusOK {
+		return "", false, fmt.Errorf("unexpected status code: %d", res.Status)
+	}
+
 	isDifferentVersion := res.Body != version.Version
 	return res.Body, isDifferentVersion, nil
 }

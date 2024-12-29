@@ -23,7 +23,6 @@ func (s *Server) errorHandler(
 			safeMessage = statusText
 		}
 
-		// Log the real error to the server logger.
 		s.Logger.ErrorNs(
 			log.NsServer, "error while handling request", log.KV{
 				"id":      errorId,
@@ -35,7 +34,6 @@ func (s *Server) errorHandler(
 			},
 		)
 
-		// Respond with a safe error message.
 		_ = httputil.WriteJSON(w, err.HTTPStatus, map[string]any{
 			"id":      errorId,
 			"error":   statusText,
@@ -50,6 +48,7 @@ func (s *Server) errorHandler(
 				"ip":    ip,
 			},
 		)
+
 		_ = httputil.WriteString(
 			w, http.StatusInternalServerError, "Internal Server Error - "+errorId,
 		)
