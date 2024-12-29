@@ -3,6 +3,7 @@ package repl
 import (
 	"fmt"
 
+	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 )
@@ -72,7 +73,7 @@ func cmdQuery(r *Repl, input string) {
 
 	fmt.Println(tw.Render())
 	if res.Time > 0 {
-		fmt.Printf("Time: %f seconds\n", res.Time)
+		color.RGB(128, 128, 128).Printf("Time: %f seconds\n", res.Time)
 	}
 	fmt.Println()
 }

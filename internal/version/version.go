@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/logrusorgru/aurora/v4"
+	"github.com/fatih/color"
 )
 
 const Version = "v0.0.1"
@@ -21,8 +21,15 @@ func asciiArtTpl() string {
 		`For more information visit https://github.com/nsqlite/nsqlite and please leave a star`,
 	}
 
+	lines[0] = color.RGB(235, 250, 250).Sprint(lines[0])
+	lines[1] = color.RGB(214, 245, 245).Sprint(lines[1])
+	lines[2] = color.RGB(173, 235, 235).Sprint(lines[2])
+	lines[3] = color.RGB(132, 225, 225).Sprint(lines[3])
+	lines[4] = color.RGB(97, 214, 214).Sprint(lines[4])
+	lines[5] = color.RGB(97, 214, 214).Sprint(lines[5])
+	lines[6] = color.RGB(97, 214, 214).Sprint(lines[6])
+
 	asciiArt := strings.Join(lines, "\n")
-	asciiArt = aurora.Cyan(asciiArt).Bold().String()
 	return asciiArt
 }
 
