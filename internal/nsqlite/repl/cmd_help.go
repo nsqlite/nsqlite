@@ -43,28 +43,28 @@ func cmdHelp() {
 }
 
 func cmdHelpCompleter(line string) []string {
-	suggestions := map[string]string{
-		"SELECT ":               "Select data from a table",
-		"SELECT * FROM ":        "Select all columns from a table",
-		"SELECT COUNT(*) FROM ": "Count the number of rows in a table",
-		"INSERT INTO ":          "Insert data into a table",
-		"UPDATE":                "Update data in a table",
-		"DELETE FROM ":          "Delete data from a table",
-		"CREATE TABLE ":         "Create a new table",
-		"DROP TABLE ":           "Drop a table",
-		"ALTER TABLE ":          "Alter a table",
+	suggestions := []string{
+		"SELECT ",
+		"SELECT * FROM ",
+		"SELECT COUNT(*) FROM ",
+		"INSERT INTO ",
+		"UPDATE",
+		"DELETE FROM ",
+		"CREATE TABLE ",
+		"DROP TABLE ",
+		"ALTER TABLE ",
 	}
 
 	for _, cmd := range cmdHelpCommands() {
 		if cmd.autocomplete {
-			suggestions[cmd.name] = cmd.help
+			suggestions = append(suggestions, cmd.name)
 		}
 	}
 
 	results := []string{}
-	for key := range suggestions {
-		if strings.HasPrefix(strings.ToLower(key), strings.ToLower(line)) {
-			results = append(results, key)
+	for _, suggestion := range suggestions {
+		if strings.HasPrefix(strings.ToLower(suggestion), strings.ToLower(line)) {
+			results = append(results, suggestion)
 		}
 	}
 
