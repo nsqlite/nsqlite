@@ -426,15 +426,19 @@ func (db *DB) Query(ctx context.Context, query Query) (QueryResult, error) {
 		return QueryResult{}, fmt.Errorf("failed to detect query type: %w", err)
 	}
 
+	if typeOfQuery == QueryTypeBegin && query.TxId != "" {
+		return QueryResult{}, errors.New("stepping, cannot start a transaction within a transaction")
+	}
+
 	switch typeOfQuery {
-	case QueryTypeRead:
-		return db.executeReadQuery(ctx, query)
 	case QueryTypeBegin:
 		return db.executeBeginQuery()
 	case QueryTypeCommit:
 		return db.executeCommitQuery(query)
 	case QueryTypeRollback:
 		return db.executeRollbackQuery(query)
+	case QueryTypeRead:
+		return db.executeReadQuery(ctx, query)
 	case QueryTypeWrite:
 		return db.executeWriteQuery(ctx, query)
 	}
