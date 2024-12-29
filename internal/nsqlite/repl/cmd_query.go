@@ -3,15 +3,15 @@ package repl
 import (
 	"fmt"
 
-	"github.com/jedib0t/go-pretty/table"
-	"github.com/jedib0t/go-pretty/text"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 func cmdQuery(r *Repl, input string) {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
 	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color.Header = text.Colors{text.FgHiWhite, text.Bold}
+	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
 
 	res, err := r.clientInst.SendQuery(input, r.txId)
 	if err != nil && res.Error == "" {
@@ -71,4 +71,8 @@ func cmdQuery(r *Repl, input string) {
 	}
 
 	fmt.Println(tw.Render())
+	if res.Time > 0 {
+		fmt.Printf("Time: %f seconds\n", res.Time)
+	}
+	fmt.Println()
 }

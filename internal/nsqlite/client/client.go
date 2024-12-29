@@ -68,7 +68,8 @@ func (c *Client) RemoteVersion() (string, bool, error) {
 // SendQueryResponse represents the response of a query sent to the remote
 // server.
 type SendQueryResponse struct {
-	Type string `json:"type"`
+	Type string  `json:"type"`
+	Time float64 `json:"time"`
 
 	// For read queries
 	Columns []string `json:"columns"`
