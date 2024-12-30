@@ -7,7 +7,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const Version = "v0.0.1"
+const Version = "v0.1.0"
 
 // asciiArtTpl returns the ASCII art of nsqlited.
 func asciiArtTpl() string {
