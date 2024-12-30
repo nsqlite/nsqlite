@@ -325,10 +325,13 @@ func (db *DB) Close() error {
 func (db *DB) processWriteChan() {
 	defer db.wg.Done()
 	for task := range db.writeChan {
-		tx, found := db.getTransactionById(task.query.TxId)
-		var result sql.Result
-		var err error
+		tx, found, err := db.getTransactionById(task.query.TxId)
+		if err != nil {
+			task.errorChan <- fmt.Errorf("failed to get transaction: %w", err)
+			continue
+		}
 
+		var result sql.Result
 		if found {
 			result, err = tx.Exec(task.query.Query, task.query.Params...)
 		} else {
@@ -477,7 +480,7 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 
 // executeCommitQuery commits an existing transaction.
 func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
-	tx, found := db.getTransactionById(query.TxId)
+	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
 		return QueryResult{}, fmt.Errorf("no transaction found for commit")
 	}
@@ -499,7 +502,7 @@ func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 
 // executeRollbackQuery rolls back an existing transaction.
 func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
-	tx, found := db.getTransactionById(query.TxId)
+	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
 		return QueryResult{}, fmt.Errorf("no transaction found for rollback")
 	}
@@ -521,9 +524,15 @@ func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 
 // getTransactionById returns a transaction by its ID and updates its
 // lastUsed time.
-func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
+//
+//   - If txId is empty, it returns false without an error.
+//   - If txId is not empty, it returns false with an error if the transaction
+//     is not found.
+//   - If txId is not empty and the transaction is found, it returns true
+//     without an error.
+func (db *DB) getTransactionById(txId string) (*sql.Tx, bool, error) {
 	if txId == "" {
-		return nil, false
+		return nil, false, nil
 	}
 
 	db.transactionsMutex.Lock()
@@ -531,13 +540,15 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool) {
 
 	data, found := db.transactions[txId]
 	if !found {
-		return nil, false
+		return nil, false, errors.New(
+			"transaction not found or timed out, check your settings",
+		)
 	}
 
 	data.lastUsed = time.Now()
 	db.transactions[txId] = data
 
-	return data.tx, true
+	return data.tx, true, nil
 }
 
 // executeWriteQuery increments the write queue count, sends the task,
@@ -576,12 +587,12 @@ func (db *DB) executeWriteQuery(
 func (db *DB) executeReadQuery(
 	ctx context.Context, query Query,
 ) (QueryResult, error) {
-	tx, found := db.getTransactionById(query.TxId)
-	var (
-		result *sql.Rows
-		err    error
-	)
+	tx, found, err := db.getTransactionById(query.TxId)
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get transaction: %w", err)
+	}
 
+	var result *sql.Rows
 	if found {
 		result, err = tx.QueryContext(ctx, query.Query, query.Params...)
 	} else {
