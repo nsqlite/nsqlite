@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 )
 
 func cmdQuery(r *Repl, input string) {
@@ -14,23 +15,26 @@ func cmdQuery(r *Repl, input string) {
 	tw.Style().Format.Header = text.FormatDefault
 	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
 
-	res, err := r.clientInst.SendQuery(input, r.txId)
+	res, err := r.client.Query(nsqlitehttp.Query{
+		TxId:  r.txId,
+		Query: input,
+	})
 	if err != nil && res.Error == "" {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{err.Error()})
 	}
 
-	if res.Type == "error" {
+	if res.Type == nsqlitehttp.QueryResponseError {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{r.cleanError(res.Error)})
 	}
 
-	if res.Type == "ok" {
+	if res.Type == nsqlitehttp.QueryResponseOK {
 		tw.AppendHeader(table.Row{"OK"})
 		tw.AppendRow(table.Row{"OK"})
 	}
 
-	if res.Type == "begin" {
+	if res.Type == nsqlitehttp.QueryResponseBegin {
 		if res.TxId == "" {
 			tw.AppendHeader(table.Row{"Error"})
 			tw.AppendRow(table.Row{"No transaction ID returned"})
@@ -42,24 +46,24 @@ func cmdQuery(r *Repl, input string) {
 		}
 	}
 
-	if res.Type == "commit" {
+	if res.Type == nsqlitehttp.QueryResponseCommit {
 		r.setTxId("")
 		tw.AppendHeader(table.Row{"OK"})
 		tw.AppendRow(table.Row{"Transaction committed"})
 	}
 
-	if res.Type == "rollback" {
+	if res.Type == nsqlitehttp.QueryResponseRollback {
 		r.setTxId("")
 		tw.AppendHeader(table.Row{"OK"})
 		tw.AppendRow(table.Row{"Transaction rolled back"})
 	}
 
-	if res.Type == "write" {
+	if res.Type == nsqlitehttp.QueryResponseWrite {
 		tw.AppendHeader(table.Row{"-", "Rows Affected", "Last Insert ID"})
 		tw.AppendRow(table.Row{"OK", res.RowsAffected, res.LastInsertID})
 	}
 
-	if res.Type == "read" {
+	if res.Type == nsqlitehttp.QueryResponseRead {
 		header := table.Row{}
 		for _, col := range res.Columns {
 			header = append(header, col)

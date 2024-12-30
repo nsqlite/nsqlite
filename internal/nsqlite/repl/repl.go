@@ -8,16 +8,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nsqlite/nsqlite/internal/nsqlite/client"
 	"github.com/nsqlite/nsqlite/internal/nsqlite/config"
 	"github.com/nsqlite/nsqlite/internal/util/sysutil"
 	"github.com/nsqlite/nsqlite/internal/version"
+	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 	"github.com/peterh/liner"
 )
 
 type Repl struct {
 	conf        config.Config
-	clientInst  client.Client
+	client      *nsqlitehttp.Client
 	ctx         context.Context
 	stop        context.CancelFunc
 	reader      *bufio.Reader
@@ -29,11 +29,11 @@ func NewRepl(
 	ctx context.Context,
 	stop context.CancelFunc,
 	conf config.Config,
-	clientInst client.Client,
+	client *nsqlitehttp.Client,
 ) Repl {
 	return Repl{
 		conf:        conf,
-		clientInst:  clientInst,
+		client:      client,
 		ctx:         ctx,
 		stop:        stop,
 		reader:      bufio.NewReader(os.Stdin),
@@ -42,13 +42,13 @@ func NewRepl(
 }
 
 func (r *Repl) Start() error {
-	remoteURL := r.conf.ParsedConnectionString.String()
+	remoteURL := r.conf.ParsedConnStr.String()
 
-	if err := r.clientInst.IsHealthy(); err != nil {
+	if err := r.client.IsHealthy(); err != nil {
 		return fmt.Errorf("failed to connect to %s: %w", remoteURL, err)
 	}
 
-	remoteVersion, isDifferentVersion, err := r.clientInst.RemoteVersion()
+	remoteVersion, err := r.client.Version()
 	if err != nil {
 		return fmt.Errorf("failed to get remote NSQLite version: %w", err)
 	}
@@ -58,7 +58,7 @@ func (r *Repl) Start() error {
 	fmt.Println(`Enter ".help" for usage hints and ".quit" or "CTRL+C" to quit`)
 	fmt.Println()
 
-	if isDifferentVersion {
+	if version.Version != remoteVersion {
 		fmt.Printf(
 			"Warning: Your client version is %s, but the server is running %s\n",
 			version.Version, remoteVersion,

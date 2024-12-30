@@ -6,12 +6,13 @@ import (
 
 	"github.com/alexflint/go-arg"
 	"github.com/nsqlite/nsqlite/internal/version"
+	"github.com/nsqlite/nsqlitego/nsqlitedsn"
 )
 
 // Config represents the configuration for nsqlite.
 type Config struct {
-	ConnectionString       string           `arg:"positional" help:"Connection string for the NSQLite database server in format http(s)://host:port?authToken=value (default to http://localhost:9876)" default:"http://localhost:9876"`
-	ParsedConnectionString ConnectionString `arg:"-"`
+	ConnectionString string              `arg:"positional" help:"Connection string for the NSQLite database server in format http(s)://host:port?authToken=value (default to http://localhost:9876)" default:"http://localhost:9876"`
+	ParsedConnStr    *nsqlitedsn.ConnStr `arg:"-"`
 }
 
 func (Config) Version() string {
@@ -33,7 +34,7 @@ func MustParse(args []string) Config {
 	}
 	parser.MustParse(args[1:])
 
-	cfg.ParsedConnectionString, err = parseConnectionString(cfg.ConnectionString)
+	cfg.ParsedConnStr, err = nsqlitedsn.NewConnStrFromText(cfg.ConnectionString)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/nsqlite/nsqlite/internal/nsqlite/client"
 	"github.com/nsqlite/nsqlite/internal/nsqlite/config"
 	"github.com/nsqlite/nsqlite/internal/nsqlite/repl"
 	"github.com/nsqlite/nsqlite/internal/version"
+	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 )
 
 // Run runs the NSQLite CLI.
@@ -22,8 +22,12 @@ func Run(ctx context.Context) error {
 
 	fmt.Println(version.ClientVersion())
 
-	clientInst := client.NewClient(conf.ParsedConnectionString)
-	rp := repl.NewRepl(ctx, stop, conf, clientInst)
+	client, err := nsqlitehttp.NewClient(conf.ConnectionString)
+	if err != nil {
+		return err
+	}
+
+	rp := repl.NewRepl(ctx, stop, conf, client)
 	defer rp.Shutdown()
 	go func() {
 		if err := rp.Start(); err != nil {
