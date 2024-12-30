@@ -23,13 +23,18 @@ func Run(ctx context.Context) error {
 
 	fmt.Println(version.ServerVersion())
 	logger := log.NewLogger(os.Stdout)
-	logger.Info("starting NSQLite server")
+	logger.Info("starting NSQLite server", log.KV{
+		"dataDirectory": conf.DataDirectory,
+		"listenHost":    conf.ListenHost,
+		"listenPort":    conf.ListenPort,
+		"txIdleTimeout": conf.TxIdleTimeout,
+	})
 
 	dbInstance, err := db.NewDB(db.Config{
-		Logger:                 logger,
-		Directory:              conf.DataDirectory,
-		DisableOptimizations:   conf.DisableOptimizations,
-		TransactionIdleTimeout: conf.TransactionIdleTimeout,
+		Logger:               logger,
+		DataDirectory:        conf.DataDirectory,
+		DisableOptimizations: conf.DisableOptimizations,
+		TxIdleTimeout:        conf.TxIdleTimeout,
 	})
 	if err != nil {
 		return fmt.Errorf("error starting database: %w", err)

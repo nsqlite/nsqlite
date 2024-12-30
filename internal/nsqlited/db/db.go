@@ -29,14 +29,14 @@ var (
 type Config struct {
 	// Logger is the shared NSQLite logger.
 	Logger log.Logger
-	// Directory is the directory where the database files are stored.
-	Directory string
+	// DataDirectory is the directory where the database files are stored.
+	DataDirectory string
 	// DisableOptimizations disables the startup performance optimizations
 	// for the underlying SQLite database.
 	DisableOptimizations bool
-	// TransactionIdleTimeout if a transaction is not active for this duration, it
+	// TxIdleTimeout if a transaction is not active for this duration, it
 	// will be rolled back.
-	TransactionIdleTimeout time.Duration
+	TxIdleTimeout time.Duration
 }
 
 // DB represents the SQLite integration for NSQLite.
@@ -138,18 +138,18 @@ func NewDB(config Config) (*DB, error) {
 	if !config.Logger.IsInitialized() {
 		return nil, errors.New("logger is required")
 	}
-	if config.Directory == "" {
+	if config.DataDirectory == "" {
 		return nil, errors.New("database directory is required")
 	}
-	if err := os.MkdirAll(config.Directory, 0755); err != nil {
+	if err := os.MkdirAll(config.DataDirectory, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
-	if config.TransactionIdleTimeout <= 0 {
+	if config.TxIdleTimeout <= 0 {
 		return nil, errors.New("transaction idle timeout must be provided")
 	}
 
-	statsFilePath := path.Join(config.Directory, "stats.json")
-	databasePath := path.Join(config.Directory, "database.sqlite")
+	statsFilePath := path.Join(config.DataDirectory, "stats.json")
+	databasePath := path.Join(config.DataDirectory, "database.sqlite")
 	readWriteDSN := createDSN(databasePath, false, config.DisableOptimizations)
 	readOnlyDSN := createDSN(databasePath, true, config.DisableOptimizations)
 
@@ -198,7 +198,7 @@ func NewDB(config Config) (*DB, error) {
 	go db.processWriteChan()
 
 	db.wg.Add(1)
-	go db.monitorIdleTransactions(config.TransactionIdleTimeout)
+	go db.monitorIdleTransactions(config.TxIdleTimeout)
 
 	db.wg.Add(1)
 	go db.runStatsSync()
