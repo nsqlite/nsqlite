@@ -27,7 +27,7 @@ func Run(ctx context.Context) error {
 		"dataDirectory": conf.DataDirectory,
 		"listenHost":    conf.ListenHost,
 		"listenPort":    conf.ListenPort,
-		"txIdleTimeout": conf.TxIdleTimeout,
+		"txIdleTimeout": conf.TxIdleTimeout.String(),
 	})
 
 	dbInstance, err := db.NewDB(db.Config{
