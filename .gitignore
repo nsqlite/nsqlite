@@ -4,6 +4,7 @@
 /tmp
 /dist
 /.task
+/completion
 
 # DB Data
 /data
