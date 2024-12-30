@@ -10,6 +10,7 @@ tasks:
     cmds:
       - go install ./cmd/nsqlite/.
       - go install ./cmd/nsqlited/.
+      - go install ./cmd/nsqlitebench/.
 
   runc:
     desc: Build an run NSQLite CLI
@@ -21,6 +22,7 @@ tasks:
     sources:
       - "**/*.go"
       - exclude: ./internal/nsqlited/**/*
+      - exclude: ./internal/nsqlitebench/**/*
       - exclude: ./.git/**/*
       - exclude: ./temp/**/*
       - exclude: ./tmp/**/*
@@ -46,6 +48,7 @@ tasks:
     sources:
       - "**/*.go"
       - exclude: ./internal/nsqlite/**/*
+      - exclude: ./internal/nsqlitebench/**/*
       - exclude: ./.git/**/*
       - exclude: ./temp/**/*
       - exclude: ./tmp/**/*
@@ -54,6 +57,26 @@ tasks:
     generates:
       - ./dist/nsqlited
     cmd: go build -o ./dist/nsqlited ./cmd/nsqlited/.
+
+  runb:
+    desc: Build an run NSQLite Benchmark
+    deps: [buildb]
+    cmd: ./dist/nsqlitebench {{.CLI_ARGS}}
+
+  buildb:
+    desc: Build NSQLite Benchmark
+    sources:
+      - "**/*.go"
+      - exclude: ./internal/nsqlite/**/*
+      - exclude: ./internal/nsqlited/**/*
+      - exclude: ./.git/**/*
+      - exclude: ./temp/**/*
+      - exclude: ./tmp/**/*
+      - exclude: ./dist/**/*
+      - exclude: "**/*_test.go"
+    generates:
+      - ./dist/nsqlitebench
+    cmd: go build -o ./dist/nsqlitebench ./cmd/nsqlitebench/.
 
   test:
     desc: Run tests
