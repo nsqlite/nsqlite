@@ -122,8 +122,8 @@ func (s *Server) Start() error {
 	}
 
 	s.Logger.InfoNs(log.NsServer, "server started at "+localAddr, log.KV{
-		"listen_host": s.ListenHost,
-		"listen_port": s.ListenPort,
+		"listenHost": s.ListenHost,
+		"listenPort": s.ListenPort,
 	})
 
 	err := s.server.ListenAndServe()
