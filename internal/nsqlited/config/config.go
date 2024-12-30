@@ -20,7 +20,7 @@ type Config struct {
 	DisableOptimizations   bool          `arg:"--disable-optimizations,env:NSQLITE_DISABLE_OPTIMIZATIONS" help:"Disable performance optimizations at startup for the underlying SQLite database, allowing manual tuning" default:"false"`
 	ListenHost             string        `arg:"--listen-host,env:NSQLITE_LISTEN_HOST" help:"Host for the server to listen on" default:"0.0.0.0"`
 	ListenPort             string        `arg:"--listen-port,env:NSQLITE_LISTEN_PORT" help:"Port for the server to listen on" default:"9876"`
-	TransactionIdleTimeout time.Duration `arg:"--transaction-idle-timeout,env:NSQLITE_TRANSACTION_IDLE_TIMEOUT" help:"If a transaction is not active for this duration, it will be rolled back. Valid time units are ns, us (or µs), ms, s, m, h" default:"5m"`
+	TransactionIdleTimeout time.Duration `arg:"--transaction-idle-timeout,env:NSQLITE_TRANSACTION_IDLE_TIMEOUT" help:"If a transaction is not active for this duration, it will be rolled back. Valid time units are ns, us (or µs), ms, s, m, h" default:"10s"`
 }
 
 func (Config) Version() string {
