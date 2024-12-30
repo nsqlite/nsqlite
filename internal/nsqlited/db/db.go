@@ -21,6 +21,10 @@ import (
 	"github.com/orsinium-labs/enum"
 )
 
+var (
+	ErrTransactionNotFound = errors.New("transaction not found or timed out, check your settings")
+)
+
 // Config represents the configuration for a DB instance.
 type Config struct {
 	// Logger is the shared NSQLite logger.
@@ -482,7 +486,7 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
-		return QueryResult{}, fmt.Errorf("no transaction found for commit")
+		return QueryResult{}, ErrTransactionNotFound
 	}
 	if err := tx.Commit(); err != nil {
 		return QueryResult{}, fmt.Errorf("failed to commit transaction: %w", err)
@@ -504,7 +508,7 @@ func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
-		return QueryResult{}, fmt.Errorf("no transaction found for rollback")
+		return QueryResult{}, ErrTransactionNotFound
 	}
 	if err := tx.Rollback(); err != nil {
 		return QueryResult{}, fmt.Errorf("failed to rollback transaction: %w", err)
@@ -540,9 +544,7 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool, error) {
 
 	data, found := db.transactions[txId]
 	if !found {
-		return nil, false, errors.New(
-			"transaction not found or timed out, check your settings",
-		)
+		return nil, false, ErrTransactionNotFound
 	}
 
 	data.lastUsed = time.Now()

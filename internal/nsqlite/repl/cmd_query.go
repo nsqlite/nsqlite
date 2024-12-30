@@ -2,10 +2,12 @@ package repl
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
 	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 )
 
@@ -27,6 +29,10 @@ func cmdQuery(r *Repl, input string) {
 	if res.Type == nsqlitehttp.QueryResponseError {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{r.cleanError(res.Error)})
+
+		if strings.Contains(res.Error, db.ErrTransactionNotFound.Error()) {
+			r.setTxId("")
+		}
 	}
 
 	if res.Type == nsqlitehttp.QueryResponseOK {
