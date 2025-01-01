@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/nsqlite/nsqlite/internal/nsqlitebench/benchbar"
 )
 
 type benchmarkSimpleConfig struct {
@@ -26,6 +28,9 @@ func runBenchmarkSimple(
 	wg := sync.WaitGroup{}
 	wgch := make(chan bool, conf.insertGoroutines)
 	errChan := make(chan error, conf.insertXUsers)
+	bar := benchbar.NewBar(
+		fmt.Sprintf("Inserting %d users", conf.insertXUsers), conf.insertXUsers,
+	)
 
 	for idx := range conf.insertXUsers {
 		wg.Add(1)
@@ -52,6 +57,7 @@ func runBenchmarkSimple(
 				return
 			}
 
+			bar.Inc()
 			atomic.AddUint64(&totalWrites, uint64(rowsAffected))
 		}()
 	}
@@ -65,6 +71,9 @@ func runBenchmarkSimple(
 			return benchmarkResult{}, fmt.Errorf("error when inserting: %w", e)
 		}
 	}
+
+	bar.Finish()
+	bar = benchbar.NewBar("Reading users", 1)
 
 	rows, err := db.Query(
 		"SELECT id, created, email, active FROM users ORDER BY id",
@@ -80,10 +89,10 @@ func runBenchmarkSimple(
 		if err != nil {
 			return benchmarkResult{}, fmt.Errorf("error when scanning: %w", err)
 		}
-
 		atomic.AddUint64(&totalReads, 1)
 	}
 
+	bar.Finish()
 	return benchmarkResult{
 		Name:        "Simple",
 		Duration:    time.Since(start),

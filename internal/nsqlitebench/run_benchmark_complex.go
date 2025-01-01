@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/nsqlite/nsqlite/internal/nsqlitebench/benchbar"
 )
 
 type benchmarkComplexConfig struct {
@@ -30,6 +32,10 @@ func runBenchmarkComplex(
 	wgU := sync.WaitGroup{}
 	chU := make(chan bool, conf.insertGoroutines)
 	errU := make(chan error, conf.insertXUsers)
+	bar := benchbar.NewBar(
+		fmt.Sprintf("Inserting %d users", conf.insertXUsers), conf.insertXUsers,
+	)
+
 	for idx := range conf.insertXUsers {
 		wgU.Add(1)
 		chU <- true
@@ -51,22 +57,31 @@ func runBenchmarkComplex(
 				errU <- err
 				return
 			}
+
+			bar.Inc()
 			atomic.AddUint64(&totalWrites, uint64(affected))
 		}()
 	}
+
 	wgU.Wait()
 	close(chU)
 	close(errU)
+
 	for e := range errU {
 		if e != nil {
 			return benchmarkResult{}, fmt.Errorf("error inserting users: %w", e)
 		}
 	}
+	bar.Finish()
 
 	totalArticles := conf.insertXUsers * conf.insertYArticlesPerUser
 	wgA := sync.WaitGroup{}
 	chA := make(chan bool, conf.insertGoroutines)
 	errA := make(chan error, totalArticles)
+	bar = benchbar.NewBar(
+		fmt.Sprintf("Inserting %d articles", totalArticles), totalArticles,
+	)
+
 	for idx := range totalArticles {
 		wgA.Add(1)
 		chA <- true
@@ -89,22 +104,31 @@ func runBenchmarkComplex(
 				errA <- err
 				return
 			}
+
+			bar.Inc()
 			atomic.AddUint64(&totalWrites, uint64(affected))
 		}()
 	}
+
 	wgA.Wait()
 	close(chA)
 	close(errA)
+
 	for e := range errA {
 		if e != nil {
 			return benchmarkResult{}, fmt.Errorf("error inserting articles: %w", e)
 		}
 	}
+	bar.Finish()
 
 	totalComments := totalArticles * conf.insertZCommentsPerArticle
 	wgC := sync.WaitGroup{}
 	chC := make(chan bool, conf.insertGoroutines)
 	errC := make(chan error, totalComments)
+	bar = benchbar.NewBar(
+		fmt.Sprintf("Inserting %d comments", totalComments), totalComments,
+	)
+
 	for idx := range totalComments {
 		wgC.Add(1)
 		chC <- true
@@ -127,18 +151,24 @@ func runBenchmarkComplex(
 				errC <- err
 				return
 			}
+
+			bar.Inc()
 			atomic.AddUint64(&totalWrites, uint64(affected))
 		}()
 	}
+
 	wgC.Wait()
 	close(chC)
 	close(errC)
+
 	for e := range errC {
 		if e != nil {
 			return benchmarkResult{}, fmt.Errorf("error inserting comments: %w", e)
 		}
 	}
+	bar.Finish()
 
+	bar = benchbar.NewBar("Reading users, articles, and comments", 1)
 	rows, err := db.Query(`
 		SELECT
 		users.id, users.created, users.email, users.active,
@@ -173,6 +203,7 @@ func runBenchmarkComplex(
 		atomic.AddUint64(&totalReads, 1)
 	}
 
+	bar.Finish()
 	return benchmarkResult{
 		Name:        "Complex",
 		Duration:    time.Since(start),

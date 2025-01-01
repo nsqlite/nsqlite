@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/nsqlite/nsqlite/internal/nsqlitebench/benchbar"
 )
 
 type benchmarkManyConfig struct {
@@ -41,6 +43,9 @@ func runBenchmarkMany(
 	wgInsert := sync.WaitGroup{}
 	chInsert := make(chan bool, conf.insertGoroutines)
 	errInsert := make(chan error, conf.insertXUsers)
+	bar := benchbar.NewBar(
+		fmt.Sprintf("Inserting %d users", conf.insertXUsers), conf.insertXUsers,
+	)
 
 	for idx := range conf.insertXUsers {
 		wgInsert.Add(1)
@@ -62,6 +67,8 @@ func runBenchmarkMany(
 				errInsert <- err
 				return
 			}
+
+			bar.Inc()
 			atomic.AddUint64(&totalWrites, uint64(affected))
 		}()
 	}
@@ -78,10 +85,15 @@ func runBenchmarkMany(
 	if err := tx.Commit(); err != nil {
 		return benchmarkResult{}, err
 	}
+	bar.Finish()
 
 	wgQuery := sync.WaitGroup{}
 	chQuery := make(chan bool, conf.queryGoroutines)
 	errQuery := make(chan error, conf.queryUsersYTimes)
+	bar = benchbar.NewBar(
+		fmt.Sprintf("Querying all users %d times", conf.queryUsersYTimes),
+		conf.queryUsersYTimes,
+	)
 
 	for i := 0; i < conf.queryUsersYTimes; i++ {
 		wgQuery.Add(1)
@@ -99,6 +111,7 @@ func runBenchmarkMany(
 				return
 			}
 			defer rows.Close()
+
 			for rows.Next() {
 				var id, created, active int
 				var email string
@@ -108,6 +121,8 @@ func runBenchmarkMany(
 				}
 				atomic.AddUint64(&totalReads, 1)
 			}
+
+			bar.Inc()
 		}()
 	}
 
@@ -120,6 +135,7 @@ func runBenchmarkMany(
 			return benchmarkResult{}, e
 		}
 	}
+	bar.Finish()
 
 	return benchmarkResult{
 		Name:        "Many",
