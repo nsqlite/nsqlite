@@ -42,3 +42,8 @@ func ServerVersion() string {
 func ClientVersion() string {
 	return fmt.Sprintf(asciiArtTpl(), "CLI")
 }
+
+// BenchVersion returns the benchmark version of nsqlite.
+func BenchVersion() string {
+	return fmt.Sprintf(asciiArtTpl(), "Benchmark")
+}
