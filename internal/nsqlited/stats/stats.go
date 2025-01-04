@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// Stat holds counters for different query types.
-type Stat struct {
+// Stats holds atomic counters for different query types.
+type Stats struct {
 	All      int64
 	Read     int64
 	Write    int64
@@ -17,7 +18,7 @@ type Stat struct {
 	Rollback int64
 }
 
-// DetailedStats is used for the JSON representation of each Stat.
+// DetailedStats is the JSON-friendly representation of Stats.
 type DetailedStats struct {
 	All      int64 `json:"all"`
 	Read     int64 `json:"read"`
@@ -27,7 +28,7 @@ type DetailedStats struct {
 	Rollback int64 `json:"rollback"`
 }
 
-// StatsWithMinute links a specific minute (RFC3339) with its stats.
+// StatsWithMinute links a minute key with its stats.
 type StatsWithMinute struct {
 	Minute   string `json:"minute"`
 	All      int64  `json:"all"`
@@ -38,26 +39,23 @@ type StatsWithMinute struct {
 	Rollback int64  `json:"rollback"`
 }
 
-// DBStats manages per-minute and total stats, plus queued operations.
-// A background cleanup removes stats older than 24h at a fixed interval.
+// DBStats manages per-minute statistics, total stats,
+// queued writes, and queued transactions.
 type DBStats struct {
-	mu sync.Mutex
-
-	stats      map[string]Stat
-	totalStats Stat
+	minutes sync.Map // key: string (minute in RFC3339) -> value: *Stats
+	total   Stats
 
 	queuedWrites       int64
 	queuedTransactions int64
 
-	stopCleanupChan chan bool
+	stopChan chan bool
 }
 
-// NewDBStats creates a DBStats instance and starts a background cleanup.
-// The cleanup runs every 10s to remove data older than 24 hours.
+// NewDBStats creates a DBStats instance and starts a cleanup worker
+// that runs every 10 seconds to remove stats older than 24 hours.
 func NewDBStats() *DBStats {
 	db := &DBStats{
-		stats:           make(map[string]Stat),
-		stopCleanupChan: make(chan bool),
+		stopChan: make(chan bool),
 	}
 	go db.runCleanupWorker()
 	return db
@@ -65,55 +63,32 @@ func NewDBStats() *DBStats {
 
 // Close stops the background cleanup worker.
 func (db *DBStats) Close() {
-	close(db.stopCleanupChan)
+	close(db.stopChan)
 }
 
-// runCleanupWorker periodically removes stats older than 24 hours.
+// runCleanupWorker removes old stats every 10 seconds without locking
+// each increment operation.
 func (db *DBStats) runCleanupWorker() {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			db.mu.Lock()
-			db.cleanupOldStats()
-			db.mu.Unlock()
-		case <-db.stopCleanupChan:
+			cutoff := time.Now().UTC().Add(-24 * time.Hour)
+			db.minutes.Range(func(key, value any) bool {
+				minuteStr := key.(string)
+				t, err := time.Parse(time.RFC3339, minuteStr)
+				if err != nil {
+					return true
+				}
+				if t.Before(cutoff) {
+					db.minutes.Delete(key)
+				}
+				return true
+			})
+		case <-db.stopChan:
 			return
-		}
-	}
-}
-
-// getTimeKey returns the current minute in RFC3339 (UTC).
-func (db *DBStats) getTimeKey() string {
-	now := time.Now().UTC().Truncate(time.Minute)
-	return now.Format(time.RFC3339)
-}
-
-// addToStats updates the stats for the current minute and totals.
-func (db *DBStats) addToStats(updateFunc func(*Stat)) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-
-	key := db.getTimeKey()
-	current := db.stats[key]
-	updateFunc(&current)
-	db.stats[key] = current
-
-	updateFunc(&db.totalStats)
-}
-
-// cleanupOldStats removes entries older than 24 hours.
-func (db *DBStats) cleanupOldStats() {
-	cutoff := time.Now().UTC().Add(-24 * time.Hour)
-	for minuteStr := range db.stats {
-		parsed, err := time.Parse(time.RFC3339, minuteStr)
-		if err != nil {
-			continue
-		}
-		if parsed.Before(cutoff) {
-			delete(db.stats, minuteStr)
 		}
 	}
 }
@@ -144,26 +119,28 @@ func (db *DBStats) cleanupOldStats() {
 //	  "queuedTransactions": ...
 //	}
 func (db *DBStats) MarshalJSON() ([]byte, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	statsPerMinute := []StatsWithMinute{}
 
-	statsArray := []StatsWithMinute{}
-	for minuteStr, st := range db.stats {
-		statsArray = append(statsArray, StatsWithMinute{
+	db.minutes.Range(func(key, val any) bool {
+		minuteStr := key.(string)
+		s := val.(*Stats)
+		statsPerMinute = append(statsPerMinute, StatsWithMinute{
 			Minute:   minuteStr,
-			All:      st.All,
-			Read:     st.Read,
-			Write:    st.Write,
-			Begin:    st.Begin,
-			Commit:   st.Commit,
-			Rollback: st.Rollback,
+			All:      atomic.LoadInt64(&s.All),
+			Read:     atomic.LoadInt64(&s.Read),
+			Write:    atomic.LoadInt64(&s.Write),
+			Begin:    atomic.LoadInt64(&s.Begin),
+			Commit:   atomic.LoadInt64(&s.Commit),
+			Rollback: atomic.LoadInt64(&s.Rollback),
 		})
-	}
+		return true
+	})
 
-	sort.Slice(statsArray, func(i, j int) bool {
-		ti, _ := time.Parse(time.RFC3339, statsArray[i].Minute)
-		tj, _ := time.Parse(time.RFC3339, statsArray[j].Minute)
-		return tj.Before(ti) // Newest first
+	sort.Slice(statsPerMinute, func(i, j int) bool {
+		ti, _ := time.Parse(time.RFC3339, statsPerMinute[i].Minute)
+		tj, _ := time.Parse(time.RFC3339, statsPerMinute[j].Minute)
+		// Newest first
+		return tj.Before(ti)
 	})
 
 	output := struct {
@@ -173,89 +150,114 @@ func (db *DBStats) MarshalJSON() ([]byte, error) {
 		QueuedTransactions int64             `json:"queuedTransactions"`
 	}{
 		TotalStats: DetailedStats{
-			All:      db.totalStats.All,
-			Read:     db.totalStats.Read,
-			Write:    db.totalStats.Write,
-			Begin:    db.totalStats.Begin,
-			Commit:   db.totalStats.Commit,
-			Rollback: db.totalStats.Rollback,
+			All:      atomic.LoadInt64(&db.total.All),
+			Read:     atomic.LoadInt64(&db.total.Read),
+			Write:    atomic.LoadInt64(&db.total.Write),
+			Begin:    atomic.LoadInt64(&db.total.Begin),
+			Commit:   atomic.LoadInt64(&db.total.Commit),
+			Rollback: atomic.LoadInt64(&db.total.Rollback),
 		},
-		Stats:              statsArray,
-		QueuedWrites:       db.queuedWrites,
-		QueuedTransactions: db.queuedTransactions,
+		Stats:              statsPerMinute,
+		QueuedWrites:       atomic.LoadInt64(&db.queuedWrites),
+		QueuedTransactions: atomic.LoadInt64(&db.queuedTransactions),
 	}
 
 	return json.Marshal(output)
 }
 
-// IncReads increments the count for read queries.
+// getMinuteStats returns a *Stats for the current minute (UTC, truncated).
+// If it doesn't exist, a new one is stored.
+func (db *DBStats) getMinuteStats() *Stats {
+	minuteKey := time.Now().UTC().Truncate(time.Minute).Format(time.RFC3339)
+	val, ok := db.minutes.Load(minuteKey)
+	if !ok {
+		statsPtr := &Stats{}
+		actual, loaded := db.minutes.LoadOrStore(minuteKey, statsPtr)
+		if loaded {
+			return actual.(*Stats)
+		}
+		return statsPtr
+	}
+	return val.(*Stats)
+}
+
+// IncReads increments read queries atomically.
 func (db *DBStats) IncReads() {
-	db.addToStats(func(s *Stat) {
-		s.Read++
-		s.All++
-	})
+	s := db.getMinuteStats()
+	atomic.AddInt64(&s.Read, 1)
+	atomic.AddInt64(&s.All, 1)
+	atomic.AddInt64(&db.total.Read, 1)
+	atomic.AddInt64(&db.total.All, 1)
 }
 
-// IncWrites increments the count for write queries.
+// IncWrites increments write queries atomically.
 func (db *DBStats) IncWrites() {
-	db.addToStats(func(s *Stat) {
-		s.Write++
-		s.All++
-	})
+	s := db.getMinuteStats()
+	atomic.AddInt64(&s.Write, 1)
+	atomic.AddInt64(&s.All, 1)
+	atomic.AddInt64(&db.total.Write, 1)
+	atomic.AddInt64(&db.total.All, 1)
 }
 
-// IncBegins increments the count for begin queries.
+// IncBegins increments begin queries atomically.
 func (db *DBStats) IncBegins() {
-	db.addToStats(func(s *Stat) {
-		s.Begin++
-		s.All++
-	})
+	s := db.getMinuteStats()
+	atomic.AddInt64(&s.Begin, 1)
+	atomic.AddInt64(&s.All, 1)
+	atomic.AddInt64(&db.total.Begin, 1)
+	atomic.AddInt64(&db.total.All, 1)
 }
 
-// IncCommits increments the count for commit queries.
+// IncCommits increments commit queries atomically.
 func (db *DBStats) IncCommits() {
-	db.addToStats(func(s *Stat) {
-		s.Commit++
-		s.All++
-	})
+	s := db.getMinuteStats()
+	atomic.AddInt64(&s.Commit, 1)
+	atomic.AddInt64(&s.All, 1)
+	atomic.AddInt64(&db.total.Commit, 1)
+	atomic.AddInt64(&db.total.All, 1)
 }
 
-// IncRollbacks increments the count for rollback queries.
+// IncRollbacks increments rollback queries atomically.
 func (db *DBStats) IncRollbacks() {
-	db.addToStats(func(s *Stat) {
-		s.Rollback++
-		s.All++
-	})
+	s := db.getMinuteStats()
+	atomic.AddInt64(&s.Rollback, 1)
+	atomic.AddInt64(&s.All, 1)
+	atomic.AddInt64(&db.total.Rollback, 1)
+	atomic.AddInt64(&db.total.All, 1)
 }
 
-// IncQueuedWrites increments the number of queued write queries.
+// IncQueuedWrites increments the queued writes counter atomically.
 func (db *DBStats) IncQueuedWrites() {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	db.queuedWrites++
+	atomic.AddInt64(&db.queuedWrites, 1)
 }
 
-// DecQueuedWrites decrements the number of queued write queries.
+// DecQueuedWrites decrements the queued writes counter atomically.
 func (db *DBStats) DecQueuedWrites() {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	if db.queuedWrites > 0 {
-		db.queuedWrites--
+	for {
+		old := atomic.LoadInt64(&db.queuedWrites)
+		if old <= 0 {
+			return
+		}
+		if atomic.CompareAndSwapInt64(&db.queuedWrites, old, old-1) {
+			return
+		}
 	}
 }
 
-// IncQueuedTransactions increments the number of queued transactions.
+// IncQueuedTransactions increments the queued transactions counter atomically.
 func (db *DBStats) IncQueuedTransactions() {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	db.queuedTransactions++
+	atomic.AddInt64(&db.queuedTransactions, 1)
 }
 
-// DecQueuedTransactions decrements the number of queued transactions.
+// DecQueuedTransactions decrements the queued transactions counter atomically.
 func (db *DBStats) DecQueuedTransactions() {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-	if db.queuedTransactions > 0 {
-		db.queuedTransactions--
+	for {
+		old := atomic.LoadInt64(&db.queuedTransactions)
+		if old <= 0 {
+			return
+		}
+		if atomic.CompareAndSwapInt64(&db.queuedTransactions, old, old-1) {
+			return
+		}
 	}
 }
