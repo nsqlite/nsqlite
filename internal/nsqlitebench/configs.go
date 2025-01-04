@@ -9,20 +9,20 @@ type benchmarksConfig struct {
 }
 
 func getMattnConfig() benchmarksConfig {
-	insertGoroutines := 20
-	queryGoroutines := 50
+	insertGoroutines := 200
+	queryGoroutines := 500
 
 	return benchmarksConfig{
 		benchmarkSimpleConfig: benchmarkSimpleConfig{
-			insertXUsers:     1_000_000,
+			insertXUsers:     500_000,
 			insertGoroutines: insertGoroutines,
 		},
 
 		benchmarkComplexConfig: benchmarkComplexConfig{
 			insertXUsers:              400,
 			insertYArticlesPerUser:    100,
-			insertZCommentsPerArticle: 20,
-			insertGoroutines:          1,
+			insertZCommentsPerArticle: 2,
+			insertGoroutines:          insertGoroutines,
 		},
 
 		benchmarkManyConfig: benchmarkManyConfig{
