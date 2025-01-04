@@ -21,7 +21,7 @@ func asciiArtTpl() string {
 		`For more information visit https://github.com/nsqlite/nsqlite and please leave a star`,
 	}
 
-	lines[0] = color.RGB(235, 250, 250).Sprint(lines[0])
+	lines[0] = color.RGB(214, 245, 245).Sprint(lines[0])
 	lines[1] = color.RGB(214, 245, 245).Sprint(lines[1])
 	lines[2] = color.RGB(173, 235, 235).Sprint(lines[2])
 	lines[3] = color.RGB(132, 225, 225).Sprint(lines[3])
