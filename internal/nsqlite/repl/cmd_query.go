@@ -1,6 +1,7 @@
 package repl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -17,7 +18,7 @@ func cmdQuery(r *Repl, input string) {
 	tw.Style().Format.Header = text.FormatDefault
 	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
 
-	res, err := r.client.Query(nsqlitehttp.Query{
+	res, err := r.client.Query(context.TODO(), nsqlitehttp.Query{
 		TxId:  r.txId,
 		Query: input,
 	})

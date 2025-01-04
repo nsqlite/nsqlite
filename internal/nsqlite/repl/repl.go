@@ -44,11 +44,11 @@ func NewRepl(
 func (r *Repl) Start() error {
 	remoteURL := r.conf.ParsedConnStr.String()
 
-	if err := r.client.IsHealthy(); err != nil {
+	if err := r.client.IsHealthy(context.TODO()); err != nil {
 		return fmt.Errorf("failed to connect to %s: %w", remoteURL, err)
 	}
 
-	remoteVersion, err := r.client.Version()
+	remoteVersion, err := r.client.Version(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to get remote NSQLite version: %w", err)
 	}
