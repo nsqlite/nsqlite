@@ -11,6 +11,7 @@ import (
 	"github.com/nsqlite/nsqlite/internal/nsqlited/config"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/server"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/stats"
 	"github.com/nsqlite/nsqlite/internal/version"
 )
 
@@ -30,8 +31,12 @@ func Run(ctx context.Context) error {
 		"txIdleTimeout": conf.TxIdleTimeout.String(),
 	})
 
+	dbStats := stats.NewDBStats()
+	defer dbStats.Close()
+
 	dbInstance, err := db.NewDB(db.Config{
 		Logger:        logger,
+		DBStats:       dbStats,
 		DataDirectory: conf.DataDirectory,
 		TxIdleTimeout: conf.TxIdleTimeout,
 	})
@@ -46,7 +51,8 @@ func Run(ctx context.Context) error {
 
 	serv, err := server.NewServer(server.Config{
 		Logger:             logger,
-		Db:                 dbInstance,
+		DBStats:            dbStats,
+		DB:                 dbInstance,
 		ListenHost:         conf.ListenHost,
 		ListenPort:         conf.ListenPort,
 		AuthTokenAlgorithm: conf.AuthTokenAlgorithm,

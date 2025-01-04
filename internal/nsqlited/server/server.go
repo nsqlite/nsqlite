@@ -8,6 +8,7 @@ import (
 
 	"github.com/nsqlite/nsqlite/internal/log"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/stats"
 	"github.com/nsqlite/nsqlite/internal/util/httputil"
 )
 
@@ -15,8 +16,10 @@ import (
 type Config struct {
 	// Logger is the shared NSQLite logger.
 	Logger log.Logger
-	// Db is the NSQLite database instance to use.
-	Db *db.DB
+	// DBStats is the NSQLite database stats instance to use.
+	DBStats *stats.DBStats
+	// DB is the NSQLite database instance to use.
+	DB *db.DB
 	// ListenHost is the host to listen on.
 	ListenHost string
 	// ListenPort is the port to listen on.

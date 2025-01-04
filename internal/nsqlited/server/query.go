@@ -104,7 +104,7 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 
 	for _, q := range queries {
 		thisStart := time.Now()
-		res, err := s.Db.Query(ctx, db.Query{
+		res, err := s.DB.Query(ctx, db.Query{
 			TxId:   q.TxId,
 			Query:  q.Query,
 			Params: q.Params,
