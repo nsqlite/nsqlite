@@ -31,10 +31,9 @@ func Run(ctx context.Context) error {
 	})
 
 	dbInstance, err := db.NewDB(db.Config{
-		Logger:               logger,
-		DataDirectory:        conf.DataDirectory,
-		DisableOptimizations: conf.DisableOptimizations,
-		TxIdleTimeout:        conf.TxIdleTimeout,
+		Logger:        logger,
+		DataDirectory: conf.DataDirectory,
+		TxIdleTimeout: conf.TxIdleTimeout,
 	})
 	if err != nil {
 		return fmt.Errorf("error starting database: %w", err)
