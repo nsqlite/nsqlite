@@ -6,13 +6,13 @@ import (
 )
 
 type LoadedStats struct {
-	Stats              []Stat `json:"stats"`
-	Totals             Totals `json:"totals"`
+	StartedAt          string `json:"startedAt"`
+	Uptime             string `json:"uptime"`
 	QueuedWrites       int64  `json:"queuedWrites"`
 	QueuedTransactions int64  `json:"queuedTransactions"`
 	QueuedHTTPRequests int64  `json:"queuedHttpRequests"`
-	StartedAt          string `json:"startedAt"`
-	Uptime             string `json:"uptime"`
+	Totals             Totals `json:"totals"`
+	Stats              []Stat `json:"stats"`
 }
 
 type Totals struct {
