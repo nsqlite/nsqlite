@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/nsqlite/nsqlite/internal/log"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/config"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/log"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/server"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/stats"
 	"github.com/nsqlite/nsqlite/internal/version"

@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-sqlite3"
-	"github.com/nsqlite/nsqlite/internal/log"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/log"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/stats"
 	"github.com/orsinium-labs/enum"
 )

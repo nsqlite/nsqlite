@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/nsqlite/nsqlite/internal/log"
+	"github.com/nsqlite/nsqlite/internal/nsqlited/log"
 	"github.com/nsqlite/nsqlite/internal/util/httputil"
 )
 
