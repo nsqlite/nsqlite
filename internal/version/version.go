@@ -38,8 +38,8 @@ func ServerVersion() string {
 	return fmt.Sprintf(asciiArtTpl(), "Server")
 }
 
-// ClientVersion returns the client version of nsqlite.
-func ClientVersion() string {
+// CLIVersion returns the CLI version of nsqlite.
+func CLIVersion() string {
 	return fmt.Sprintf(asciiArtTpl(), "CLI")
 }
 

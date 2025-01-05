@@ -20,7 +20,7 @@ func Run(ctx context.Context) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fmt.Println(version.ClientVersion())
+	fmt.Println(version.CLIVersion())
 
 	client, err := nsqlitehttp.NewClient(conf.ConnectionString)
 	if err != nil {

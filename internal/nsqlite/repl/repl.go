@@ -60,7 +60,7 @@ func (r *Repl) Start() error {
 
 	if version.Version != remoteVersion {
 		fmt.Printf(
-			"Warning: Your client version is %s, but the server is running %s\n",
+			"Warning: Your CLI version is %s, but the server is running %s\n",
 			version.Version, remoteVersion,
 		)
 		fmt.Println("To avoid compatibility issues, consider using the same version on both sides")

@@ -16,7 +16,7 @@ type Config struct {
 }
 
 func (Config) Version() string {
-	return fmt.Sprintf("%s\n", version.ClientVersion())
+	return fmt.Sprintf("%s\n", version.CLIVersion())
 }
 
 // MustParse parses and validates the configuration from the command
