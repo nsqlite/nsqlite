@@ -5,11 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/nsqlite/nsqlite/internal/version"
+	"github.com/peterh/liner"
 )
 
 // benchmarkResult stores the outcome of a benchmark.
@@ -23,20 +26,48 @@ type benchmarkResult struct {
 // Run executes benchmarks for two SQLite drivers and prints the results.
 func Run(ctx context.Context) error {
 	fmt.Println(version.BenchVersion())
+	fmt.Println()
 
-	tmpDir, err := os.MkdirTemp("", "nsqbench_*")
+	tmpDir, err := os.MkdirTemp("", "nsqlitebench_*")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
+	sqliteDBPath := path.Join(tmpDir, "/benchmark.sqlite")
+	fmt.Printf("The temporary SQLite database to be benchmarked will be stored in %s\n", sqliteDBPath)
 
-	mattnDb, err := createMattnDriver(tmpDir)
+	nsqliteDSN := "http://localhost:9876"
+	fmt.Printf("The NSQLite server to be benchmarked is %s\n", color.RedString(nsqliteDSN))
+
+	fmt.Println()
+	color.Red("Make sure the NSQLite server is not important, as the benchmark will make changes to the database.")
+	fmt.Println()
+
+	line := liner.NewLiner()
+	defer line.Close()
+	line.SetCtrlCAborts(true)
+
+	for {
+		prompt, err := line.Prompt(`Enter "start" to start the benchmark, or press CTRL+C to exit: `)
+		if err != nil {
+			if err == liner.ErrPromptAborted {
+				fmt.Println("CTRL+C pressed, exiting...")
+				return nil
+			}
+			return err
+		}
+		if prompt == "start" {
+			break
+		}
+	}
+
+	mattnDb, err := createMattnDriver(sqliteDBPath)
 	if err != nil {
 		return fmt.Errorf("error opening mattn/go-sqlite3 db: %w", err)
 	}
 	defer mattnDb.Close()
 
-	nsqliteDb, err := createNsqliteDriver(tmpDir)
+	nsqliteDb, err := createNsqliteDriver(nsqliteDSN)
 	if err != nil {
 		return fmt.Errorf("error opening nsqlite/nsqlitego db: %w", err)
 	}
