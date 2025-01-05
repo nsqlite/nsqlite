@@ -73,6 +73,10 @@ type Response struct {
 // queryHandler is the HTTP handler for the /query endpoint that
 // executes SQL queries.
 func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
+	s.DBStats.IncHTTPRequests()
+	s.DBStats.IncQueuedHTTPRequests()
+	defer s.DBStats.DecQueuedHTTPRequests()
+
 	ctx := r.Context()
 
 	contentType := r.Header.Get("Content-Type")
