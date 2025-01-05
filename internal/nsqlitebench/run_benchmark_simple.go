@@ -12,11 +12,15 @@ import (
 
 type benchmarkSimpleConfig struct {
 	insertXUsers     int
+	queryYUsers      int
 	insertGoroutines int
+	queryGoroutines  int
 }
 
 // runBenchmarkSimple inserts X users and then queries all of them in single
 // query.
+//
+// This also reads the users Y times.
 func runBenchmarkSimple(
 	db *sql.DB, fullConfig benchmarksConfig,
 ) (benchmarkResult, error) {
@@ -27,10 +31,7 @@ func runBenchmarkSimple(
 
 	wg := sync.WaitGroup{}
 	wgch := make(chan bool, conf.insertGoroutines)
-	errChan := make(chan error, conf.insertXUsers)
-	bar := benchbar.NewBar(
-		fmt.Sprintf("Inserting %d users", conf.insertXUsers), conf.insertXUsers,
-	)
+	bar := benchbar.NewBar(fmt.Sprintf("Inserting %d users", conf.insertXUsers), conf.insertXUsers)
 
 	for idx := range conf.insertXUsers {
 		wg.Add(1)
@@ -47,14 +48,12 @@ func runBenchmarkSimple(
 				time.Now().Unix(), fmt.Sprintf("user%d@example.com", idx), 1,
 			)
 			if err != nil {
-				errChan <- err
-				return
+				panic(err)
 			}
 
 			rowsAffected, err := res.RowsAffected()
 			if err != nil {
-				errChan <- err
-				return
+				panic(err)
 			}
 
 			bar.Inc()
@@ -64,16 +63,9 @@ func runBenchmarkSimple(
 
 	wg.Wait()
 	close(wgch)
-	close(errChan)
-
-	for e := range errChan {
-		if e != nil {
-			return benchmarkResult{}, fmt.Errorf("error when inserting: %w", e)
-		}
-	}
 
 	bar.Finish()
-	bar = benchbar.NewBar("Reading users", 1)
+	bar = benchbar.NewBar("Reading all users in single query", 1)
 
 	rows, err := db.Query(
 		"SELECT id, created, email, active FROM users ORDER BY id",
@@ -91,6 +83,47 @@ func runBenchmarkSimple(
 		}
 		atomic.AddUint64(&totalReads, 1)
 	}
+	bar.Finish()
+
+	bar = benchbar.NewBar(fmt.Sprintf("Reading users %d times", conf.queryYUsers), conf.queryYUsers)
+	wg = sync.WaitGroup{}
+	wgch = make(chan bool, conf.queryGoroutines)
+
+	for idx := range conf.queryYUsers {
+		wg.Add(1)
+		wgch <- true
+		userID := max(idx%conf.insertXUsers, 1)
+
+		go func() {
+			defer func() {
+				wg.Done()
+				<-wgch
+			}()
+
+			rows, err := db.Query(
+				"SELECT id, created, email, active FROM users WHERE id = ?",
+				userID,
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			for rows.Next() {
+				var id, created, active int
+				var email string
+				err = rows.Scan(&id, &created, &email, &active)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			bar.Inc()
+			atomic.AddUint64(&totalReads, 1)
+		}()
+	}
+
+	wg.Wait()
+	close(wgch)
 
 	bar.Finish()
 	return benchmarkResult{
