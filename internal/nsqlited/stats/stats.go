@@ -1,8 +1,6 @@
 package stats
 
 import (
-	"encoding/json"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,19 +18,19 @@ type minuteData struct {
 
 // DBStats holds the stats for the database.
 type DBStats struct {
-	minutes sync.Map // key: string (minute RFC3339) -> value: *minuteData
-
+	startedAt          time.Time
+	minutes            sync.Map // key: string (minute RFC3339) -> value: *minuteData
 	queuedWrites       atomic.Int64
 	queuedTransactions atomic.Int64
 	queuedHTTPRequests atomic.Int64
-
-	stopChan chan bool
+	stopChan           chan bool
 }
 
 // NewDBStats creates a DBStats instance.
 func NewDBStats() *DBStats {
 	db := &DBStats{
-		stopChan: make(chan bool),
+		startedAt: time.Now().UTC(),
+		stopChan:  make(chan bool),
 	}
 	go db.runCleanupWorker()
 	return db
@@ -149,115 +147,4 @@ func (db *DBStats) IncQueuedHTTPRequests() {
 // DecQueuedHTTPRequests decrements the queued HTTP requests counter atomically.
 func (db *DBStats) DecQueuedHTTPRequests() {
 	db.queuedHTTPRequests.Add(-1)
-}
-
-// MarshalJSON produces the JSON structure:
-//
-//	{
-//	  "stats": [
-//	    {
-//	      "minute": "...",
-//	      "reads": ...,
-//	      "writes": ...,
-//	      "begins": ...,
-//	      "commits": ...,
-//	      "rollbacks": ...,
-//	      "httpRequests": ...
-//	    }
-//	  ],
-//	  "totals": {
-//	    "reads": ...,
-//	    "writes": ...,
-//	    "begins": ...,
-//	    "commits": ...,
-//	    "rollbacks": ...,
-//	    "httpRequests": ...
-//	  },
-//	  "queuedWrites": ...,
-//	  "queuedTransactions": ...,
-//	  "queuedHTTPRequests": ...
-//	}
-func (db *DBStats) MarshalJSON() ([]byte, error) {
-	type minuteEntry struct {
-		Minutes      string `json:"minutes"`
-		Reads        int64  `json:"reads"`
-		Writes       int64  `json:"writes"`
-		Begins       int64  `json:"begins"`
-		Commits      int64  `json:"commits"`
-		Rollbacks    int64  `json:"rollbacks"`
-		HTTPRequests int64  `json:"httpRequests"`
-	}
-
-	var (
-		allEntries        []minuteEntry
-		totalReads        int64
-		totalWrites       int64
-		totalBegins       int64
-		totalCommits      int64
-		totalRollbacks    int64
-		totalHTTPRequests int64
-	)
-
-	db.minutes.Range(func(key, value any) bool {
-		minuteKey := key.(string)
-		md := value.(*minuteData)
-
-		r := md.reads.Load()
-		w := md.writes.Load()
-		b := md.begins.Load()
-		c := md.commits.Load()
-		rb := md.rollbacks.Load()
-		hr := md.httpRequests.Load()
-
-		allEntries = append(allEntries, minuteEntry{
-			Minutes:      minuteKey,
-			Reads:        r,
-			Writes:       w,
-			Begins:       b,
-			Commits:      c,
-			Rollbacks:    rb,
-			HTTPRequests: hr,
-		})
-
-		totalReads += r
-		totalWrites += w
-		totalBegins += b
-		totalCommits += c
-		totalRollbacks += rb
-		totalHTTPRequests += hr
-
-		return true
-	})
-
-	sort.Slice(allEntries, func(i, j int) bool {
-		ti, _ := time.Parse(time.RFC3339, allEntries[i].Minutes)
-		tj, _ := time.Parse(time.RFC3339, allEntries[j].Minutes)
-		return tj.Before(ti)
-	})
-
-	totals := map[string]int64{
-		"reads":        totalReads,
-		"writes":       totalWrites,
-		"begins":       totalBegins,
-		"commits":      totalCommits,
-		"rollbacks":    totalRollbacks,
-		"httpRequests": totalHTTPRequests,
-	}
-
-	// Final structure
-	output := struct {
-		Stats              []minuteEntry    `json:"stats"`
-		Totals             map[string]int64 `json:"totals"`
-		QueuedWrites       int64            `json:"queuedWrites"`
-		QueuedTransactions int64            `json:"queuedTransactions"`
-		QueuedHTTPRequests int64            `json:"queuedHTTPRequests"`
-	}{
-		Stats:              allEntries,
-		Totals:             totals,
-		QueuedWrites:       db.queuedWrites.Load(),
-		QueuedTransactions: db.queuedTransactions.Load(),
-		QueuedHTTPRequests: db.queuedHTTPRequests.Load(),
-	}
-
-	return json.Marshal(output)
 }
