@@ -10,7 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlite/internal/nsqlite/styled"
 	"github.com/nsqlite/nsqlite/internal/version"
 	"github.com/peterh/liner"
 )
@@ -91,10 +91,7 @@ func Run(ctx context.Context) error {
 }
 
 func printResults(results []benchmarkResult) {
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleLight)
-	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
+	tw := styled.NewTableWriter()
 	tw.AppendHeader(table.Row{"Name", "Reads", "Writes", "Duration"})
 
 	for _, r := range results {

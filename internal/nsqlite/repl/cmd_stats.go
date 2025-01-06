@@ -6,9 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlite/internal/nsqlite/styled"
 	"github.com/nsqlite/nsqlite/internal/util/numutil"
 )
 
@@ -19,12 +18,7 @@ func cmdStats(r *Repl, statsQty int) {
 		return
 	}
 
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleLight)
-	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
-	tw.Style().Color.Footer = text.Colors{text.FgCyan, text.Bold}
-
+	tw := styled.NewTableWriter()
 	tw.AppendHeader(table.Row{"Minute (UTC)", "Reads", "Writes", "Begins", "Commits", "Rollbacks", "Requests"})
 
 	rows := []table.Row{}
@@ -62,7 +56,7 @@ func cmdStats(r *Repl, statsQty int) {
 	})
 
 	fmt.Println(tw.Render())
-	color.RGB(128, 128, 128).Printf("Showing the last 5 minutes of stats\n")
-	color.RGB(128, 128, 128).Printf("Uptime: %s\n", stats.Uptime)
+	styled.DimmedColor().Printf("Showing the last 5 minutes of stats\n")
+	styled.DimmedColor().Printf("Uptime: %s\n", stats.Uptime)
 	fmt.Println()
 }

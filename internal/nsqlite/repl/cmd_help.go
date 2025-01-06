@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlite/internal/nsqlite/styled"
 )
 
 type dotCmd struct {
@@ -31,12 +31,7 @@ func cmdHelp() {
 	fmt.Println("Available commands:")
 	cmds := cmdHelpCommands()
 
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleLight)
-	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
-	tw.AppendHeader(table.Row{"Command", "Description"})
-
+	tw := styled.NewTableWriter()
 	for _, cmd := range cmds {
 		tw.AppendRow(table.Row{cmd.name, cmd.help})
 	}

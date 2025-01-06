@@ -5,18 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nsqlite/nsqlite/internal/nsqlite/styled"
 	"github.com/nsqlite/nsqlite/internal/nsqlited/db"
 	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 )
 
 func cmdQuery(r *Repl, input string) {
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleLight)
-	tw.Style().Format.Header = text.FormatDefault
-	tw.Style().Color.Header = text.Colors{text.FgCyan, text.Bold}
+	tw := styled.NewTableWriter()
 
 	res, err := r.client.Query(context.TODO(), nsqlitehttp.Query{
 		TxId:  r.txId,
@@ -84,7 +80,7 @@ func cmdQuery(r *Repl, input string) {
 
 	fmt.Println(tw.Render())
 	if res.Time > 0 {
-		color.RGB(128, 128, 128).Printf("Time: %f seconds\n", res.Time)
+		styled.DimmedColor().Printf("Time: %f seconds\n", res.Time)
 	}
 	fmt.Println()
 }
