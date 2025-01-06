@@ -14,7 +14,7 @@ import (
 func cmdQuery(r *Repl, input string) {
 	tw := styled.NewTableWriter()
 
-	res, err := r.client.Query(context.TODO(), nsqlitehttp.Query{
+	res, err := r.client.SendQuery(context.TODO(), nsqlitehttp.Query{
 		TxId:  r.txId,
 		Query: input,
 	})

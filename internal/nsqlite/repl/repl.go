@@ -49,7 +49,7 @@ func (r *Repl) Start() error {
 		return fmt.Errorf("failed to connect to %s: %w", remoteURL, err)
 	}
 
-	remoteVersion, err := r.client.Version(context.TODO())
+	remoteVersion, err := r.client.GetVersion(context.TODO())
 	if err != nil {
 		return fmt.Errorf("failed to get remote NSQLite version: %w", err)
 	}
