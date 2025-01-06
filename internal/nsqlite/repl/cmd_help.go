@@ -32,6 +32,8 @@ func cmdHelp() {
 	cmds := cmdHelpCommands()
 
 	tw := styled.NewTableWriter()
+	tw.AppendHeader(table.Row{"Command", "Description"})
+
 	for _, cmd := range cmds {
 		tw.AppendRow(table.Row{cmd.name, cmd.help})
 	}
