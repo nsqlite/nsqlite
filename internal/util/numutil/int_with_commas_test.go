@@ -1,6 +1,7 @@
 package numutil
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 func TestIntWithCommas(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    int
+		input    int64
 		expected string
 	}{
 		{
@@ -96,8 +97,13 @@ func TestIntWithCommas(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := IntWithCommas(tt.input)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.expected, IntWithCommas(tt.input))
+			if tt.input < math.MaxInt {
+				assert.Equal(t, tt.expected, IntWithCommas(int(tt.input)))
+			}
+			if tt.input < math.MaxInt32 {
+				assert.Equal(t, tt.expected, IntWithCommas(int32(tt.input)))
+			}
 		})
 	}
 }
