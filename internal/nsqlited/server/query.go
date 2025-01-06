@@ -97,6 +97,16 @@ func (s *Server) queryHandler(w http.ResponseWriter, r *http.Request) error {
 
 	for _, q := range queries {
 		thisStart := time.Now()
+
+		if q.Query == "" {
+			results = append(results, ErrorResult{
+				Type:  resultTypeError,
+				Error: "Empty query",
+				Time:  time.Since(thisStart).Seconds(),
+			})
+			continue
+		}
+
 		res, err := s.DB.Query(ctx, db.Query{
 			TxId:   q.TxId,
 			Query:  q.Query,
