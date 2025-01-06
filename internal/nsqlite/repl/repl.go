@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/nsqlite/nsqlite/internal/nsqlite/config"
@@ -95,6 +96,20 @@ func (r *Repl) Start() error {
 
 			if input == ".tables" {
 				cmdQuery(r, `SELECT name FROM sqlite_master WHERE type = "table"`)
+				continue
+			}
+
+			if strings.HasPrefix(input, ".stats") {
+				statsQty := 5
+				numStr := strings.TrimSpace(strings.TrimPrefix(input, ".stats"))
+				if numStr != "" {
+					num, err := strconv.Atoi(numStr)
+					if err == nil {
+						statsQty = num
+					}
+				}
+
+				cmdStats(r, statsQty)
 				continue
 			}
 

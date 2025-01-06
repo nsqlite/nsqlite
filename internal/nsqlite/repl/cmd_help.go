@@ -17,6 +17,8 @@ type dotCmd struct {
 func cmdHelpCommands() []dotCmd {
 	return []dotCmd{
 		{name: ".tables", help: "List all tables in the database", autocomplete: true},
+		{name: ".stats", help: "Shows the server stats of last 5 minutes", autocomplete: true},
+		{name: ".stats N", help: "Shows the server stats of last N minutes", autocomplete: false},
 		{name: ".clear", help: "Clear the terminal screen", autocomplete: true},
 		{name: ".help", help: "Show the help message", autocomplete: true},
 		{name: ".quit", help: "Exit the application", autocomplete: true},
