@@ -72,7 +72,7 @@ type Response struct {
 
 // Query represents a single query within a request.
 type Query struct {
-	TxId   string `json:"txId,omitempty"`
+	TxId   string `json:"txId"`
 	Query  string `json:"query"`
 	Params []any  `json:"params"`
 }
