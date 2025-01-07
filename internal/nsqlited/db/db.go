@@ -45,7 +45,7 @@ type DB struct {
 	transactions            map[string]transactionData
 	transactionsMutex       sync.Mutex
 	transactionsMonitorStop chan any
-	writeChan               chan writeTask
+	writeMu                 sync.Mutex
 	wg                      sync.WaitGroup
 }
 
@@ -60,14 +60,6 @@ type Query struct {
 	TxId   string
 	Query  string
 	Params []any
-}
-
-// writeTask holds the info needed to process a single write request.
-type writeTask struct {
-	ctx        context.Context
-	query      Query
-	resultChan chan QueryResult
-	errorChan  chan error
 }
 
 // WriteResult represents the result of a write query.
@@ -143,12 +135,8 @@ func NewDB(config Config) (*DB, error) {
 		transactions:            make(map[string]transactionData),
 		transactionsMutex:       sync.Mutex{},
 		transactionsMonitorStop: make(chan any),
-		writeChan:               make(chan writeTask),
 		wg:                      sync.WaitGroup{},
 	}
-
-	db.wg.Add(1)
-	go db.processWriteChan()
 
 	db.wg.Add(1)
 	go db.monitorIdleTransactions(config.TxIdleTimeout)
@@ -190,7 +178,6 @@ func (db *DB) monitorIdleTransactions(timeout time.Duration) {
 
 // Close attempts a graceful shutdown of everything this DB manages.
 func (db *DB) Close() error {
-	close(db.writeChan)
 	close(db.transactionsMonitorStop)
 
 	db.wg.Wait()
@@ -214,51 +201,6 @@ func (db *DB) Close() error {
 	}
 
 	return nil
-}
-
-// processWriteChan processes all incoming write tasks one at a time.
-func (db *DB) processWriteChan() {
-	defer db.wg.Done()
-	for task := range db.writeChan {
-		tx, found, err := db.getTransactionById(task.query.TxId)
-		if err != nil {
-			task.errorChan <- fmt.Errorf("failed to get transaction: %w", err)
-			continue
-		}
-
-		var result sql.Result
-		if found {
-			result, err = tx.Exec(task.query.Query, task.query.Params...)
-		} else {
-			result, err = db.readWriteConn.Exec(task.query.Query, task.query.Params...)
-		}
-		if err != nil {
-			task.errorChan <- fmt.Errorf("failed to execute write query: %w", err)
-			continue
-		}
-
-		lastInsertId, err := result.LastInsertId()
-		if err != nil {
-			task.errorChan <- fmt.Errorf("failed to get last insert ID: %w", err)
-			continue
-		}
-
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			task.errorChan <- fmt.Errorf("failed to get rows affected: %w", err)
-			continue
-		}
-
-		db.DBStats.IncWrites()
-		task.resultChan <- QueryResult{
-			TxId: task.query.TxId,
-			Type: QueryTypeWrite,
-			WriteResult: WriteResult{
-				LastInsertID: lastInsertId,
-				RowsAffected: rowsAffected,
-			},
-		}
-	}
 }
 
 // queryType represents the type of a given SQLite query.
@@ -443,30 +385,45 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool, error) {
 // waits for a response, and then decrements the counter.
 func (db *DB) executeWriteQuery(ctx context.Context, query Query) (QueryResult, error) {
 	db.DBStats.IncQueuedWrites()
+	defer db.DBStats.DecQueuedWrites()
 
-	resultChan := make(chan QueryResult)
-	errorChan := make(chan error)
+	db.writeMu.Lock()
+	defer db.writeMu.Unlock()
 
-	task := writeTask{
-		ctx:        ctx,
-		query:      query,
-		resultChan: resultChan,
-		errorChan:  errorChan,
+	tx, found, err := db.getTransactionById(query.TxId)
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get transaction: %w", err)
 	}
 
-	db.writeChan <- task
-
-	select {
-	case res := <-resultChan:
-		db.DBStats.DecQueuedWrites()
-		return res, nil
-	case err := <-errorChan:
-		db.DBStats.DecQueuedWrites()
-		return QueryResult{}, err
-	case <-ctx.Done():
-		db.DBStats.DecQueuedWrites()
-		return QueryResult{}, ctx.Err()
+	var result sql.Result
+	if found {
+		result, err = tx.ExecContext(ctx, query.Query, query.Params...)
+	} else {
+		result, err = db.readWriteConn.ExecContext(ctx, query.Query, query.Params...)
 	}
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to execute write query: %w", err)
+	}
+
+	lastInsertId, err := result.LastInsertId()
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	db.DBStats.IncWrites()
+	return QueryResult{
+		TxId: query.TxId,
+		Type: QueryTypeWrite,
+		WriteResult: WriteResult{
+			LastInsertID: lastInsertId,
+			RowsAffected: rowsAffected,
+		},
+	}, nil
 }
 
 // executeReadQuery executes a read query.
