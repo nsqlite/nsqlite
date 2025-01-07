@@ -27,7 +27,7 @@ func cmdQuery(r *Repl, input string) {
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{r.cleanError(res.Error)})
 
-		if strings.Contains(res.Error, db.ErrTransactionNotFound.Error()) {
+		if strings.Contains(res.Error, db.ErrTxNotFound.Error()) {
 			r.setTxId("")
 		}
 	}

@@ -20,7 +20,8 @@ import (
 )
 
 var (
-	ErrTransactionNotFound = errors.New("transaction not found or timed out, check your settings")
+	ErrTxNotFound = errors.New("transaction not found or timed out, check your settings")
+	ErrTxWithinTx = errors.New("cannot start a transaction within a transaction")
 )
 
 // Config represents the configuration for a DB instance.
@@ -265,7 +266,7 @@ func (db *DB) Query(ctx context.Context, query Query) (QueryResult, error) {
 	}
 
 	if typeOfQuery == QueryTypeBegin && query.TxId != "" {
-		return QueryResult{}, errors.New("stepping, cannot start a transaction within a transaction")
+		return QueryResult{}, ErrTxWithinTx
 	}
 
 	switch typeOfQuery {
@@ -316,7 +317,7 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
-		return QueryResult{}, ErrTransactionNotFound
+		return QueryResult{}, ErrTxNotFound
 	}
 	if err := tx.Commit(); err != nil {
 		return QueryResult{}, fmt.Errorf("failed to commit transaction: %w", err)
@@ -337,7 +338,7 @@ func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 	tx, found, _ := db.getTransactionById(query.TxId)
 	if !found {
-		return QueryResult{}, ErrTransactionNotFound
+		return QueryResult{}, ErrTxNotFound
 	}
 	if err := tx.Rollback(); err != nil {
 		return QueryResult{}, fmt.Errorf("failed to rollback transaction: %w", err)
@@ -372,7 +373,7 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool, error) {
 
 	data, found := db.transactions[txId]
 	if !found {
-		return nil, false, ErrTransactionNotFound
+		return nil, false, ErrTxNotFound
 	}
 
 	data.lastUsed = time.Now()
