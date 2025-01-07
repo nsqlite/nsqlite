@@ -9,7 +9,6 @@ type LoadedStats struct {
 	StartedAt          string `json:"startedAt"`
 	Uptime             string `json:"uptime"`
 	QueuedWrites       int64  `json:"queuedWrites"`
-	QueuedTransactions int64  `json:"queuedTransactions"`
 	QueuedHTTPRequests int64  `json:"queuedHttpRequests"`
 	Totals             Totals `json:"totals"`
 	Stats              []Stat `json:"stats"`
@@ -94,7 +93,6 @@ func (db *DBStats) LoadStats() LoadedStats {
 		},
 		Stats:              allStats,
 		QueuedWrites:       db.queuedWrites.Load(),
-		QueuedTransactions: db.queuedTransactions.Load(),
 		QueuedHTTPRequests: db.queuedHTTPRequests.Load(),
 		StartedAt:          db.startedAt.Format(time.RFC3339),
 		Uptime:             time.Since(db.startedAt).Round(time.Second).String(),

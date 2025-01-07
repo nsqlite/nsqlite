@@ -21,7 +21,6 @@ type DBStats struct {
 	startedAt          time.Time
 	minutes            sync.Map // key: string (minute RFC3339) -> value: *minuteData
 	queuedWrites       atomic.Int64
-	queuedTransactions atomic.Int64
 	queuedHTTPRequests atomic.Int64
 	stopChan           chan bool
 }
@@ -127,16 +126,6 @@ func (db *DBStats) IncQueuedWrites() {
 // DecQueuedWrites decrements the queued writes counter atomically.
 func (db *DBStats) DecQueuedWrites() {
 	db.queuedWrites.Add(-1)
-}
-
-// IncQueuedTransactions increments the queued transactions counter atomically.
-func (db *DBStats) IncQueuedTransactions() {
-	db.queuedTransactions.Add(1)
-}
-
-// DecQueuedTransactions decrements the queued transactions counter atomically.
-func (db *DBStats) DecQueuedTransactions() {
-	db.queuedTransactions.Add(-1)
 }
 
 // IncQueuedHTTPRequests increments the queued HTTP requests counter atomically.
