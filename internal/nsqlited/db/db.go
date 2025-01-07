@@ -43,8 +43,7 @@ type DB struct {
 	isInitialized           bool
 	readWriteConn           *sql.DB
 	readOnlyConn            *sql.DB
-	transactions            map[string]transactionData
-	transactionsMutex       sync.Mutex
+	transactions            sync.Map // txId -> *transactionData
 	transactionsMonitorStop chan any
 	writeMu                 sync.Mutex
 	closeWg                 sync.WaitGroup
@@ -133,9 +132,9 @@ func NewDB(config Config) (*DB, error) {
 		isInitialized:           true,
 		readWriteConn:           readWriteConn,
 		readOnlyConn:            readOnlyConn,
-		transactions:            make(map[string]transactionData),
-		transactionsMutex:       sync.Mutex{},
+		transactions:            sync.Map{},
 		transactionsMonitorStop: make(chan any),
+		writeMu:                 sync.Mutex{},
 		closeWg:                 sync.WaitGroup{},
 	}
 
@@ -162,17 +161,21 @@ func (db *DB) monitorIdleTransactions(timeout time.Duration) {
 		case <-db.transactionsMonitorStop:
 			return
 		case <-ticker.C:
-			func() {
-				db.transactionsMutex.Lock()
-				defer db.transactionsMutex.Unlock()
-				now := time.Now()
-				for txID, data := range db.transactions {
-					if now.Sub(data.lastUsed) > timeout {
-						_ = data.tx.Rollback()
-						delete(db.transactions, txID)
-					}
+			now := time.Now()
+			db.transactions.Range(func(key, value any) bool {
+				txId, ok1 := key.(string)
+				txData, ok2 := value.(*transactionData)
+				if !ok1 || !ok2 {
+					return true
 				}
-			}()
+
+				if now.Sub(txData.lastUsed) > timeout {
+					_ = txData.tx.Rollback()
+					db.transactions.Delete(txId)
+				}
+
+				return true
+			})
 		}
 	}
 }
@@ -182,12 +185,19 @@ func (db *DB) Close() error {
 	close(db.transactionsMonitorStop)
 
 	db.closeWg.Wait()
-	db.transactionsMutex.Lock()
-	for txId, data := range db.transactions {
-		_ = data.tx.Rollback()
-		delete(db.transactions, txId)
-	}
-	db.transactionsMutex.Unlock()
+
+	db.transactions.Range(func(key, value any) bool {
+		txID, ok1 := key.(string)
+		txData, ok2 := value.(*transactionData)
+		if !ok1 || !ok2 {
+			return true
+		}
+
+		_ = txData.tx.Rollback()
+		db.transactions.Delete(txID)
+
+		return true
+	})
 
 	if db.readWriteConn != nil {
 		if err := db.readWriteConn.Close(); err != nil {
@@ -297,14 +307,10 @@ func (db *DB) executeBeginQuery() (QueryResult, error) {
 		return QueryResult{}, fmt.Errorf("failed to generate transaction ID: %w", err)
 	}
 
-	data := transactionData{
+	db.transactions.Store(txId.String(), &transactionData{
 		tx:       tx,
 		lastUsed: time.Now(),
-	}
-
-	db.transactionsMutex.Lock()
-	db.transactions[txId.String()] = data
-	db.transactionsMutex.Unlock()
+	})
 
 	db.DBStats.IncBegins()
 	return QueryResult{
@@ -323,11 +329,9 @@ func (db *DB) executeCommitQuery(query Query) (QueryResult, error) {
 		return QueryResult{}, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	db.transactionsMutex.Lock()
-	delete(db.transactions, query.TxId)
-	db.transactionsMutex.Unlock()
-
+	db.transactions.Delete(query.TxId)
 	db.DBStats.IncCommits()
+
 	return QueryResult{
 		Type: QueryTypeCommit,
 		TxId: query.TxId,
@@ -340,15 +344,14 @@ func (db *DB) executeRollbackQuery(query Query) (QueryResult, error) {
 	if !found {
 		return QueryResult{}, ErrTxNotFound
 	}
+
 	if err := tx.Rollback(); err != nil {
 		return QueryResult{}, fmt.Errorf("failed to rollback transaction: %w", err)
 	}
 
-	db.transactionsMutex.Lock()
-	delete(db.transactions, query.TxId)
-	db.transactionsMutex.Unlock()
-
+	db.transactions.Delete(query.TxId)
 	db.DBStats.IncRollbacks()
+
 	return QueryResult{
 		Type: QueryTypeRollback,
 		TxId: query.TxId,
@@ -368,18 +371,18 @@ func (db *DB) getTransactionById(txId string) (*sql.Tx, bool, error) {
 		return nil, false, nil
 	}
 
-	db.transactionsMutex.Lock()
-	defer db.transactionsMutex.Unlock()
-
-	data, found := db.transactions[txId]
+	value, found := db.transactions.Load(txId)
 	if !found {
 		return nil, false, ErrTxNotFound
 	}
 
-	data.lastUsed = time.Now()
-	db.transactions[txId] = data
+	txData, ok := value.(*transactionData)
+	if !ok {
+		return nil, false, ErrTxNotFound
+	}
 
-	return data.tx, true, nil
+	txData.lastUsed = time.Now()
+	return txData.tx, true, nil
 }
 
 // executeWriteQuery increments the write queue count, sends the task,
@@ -488,8 +491,8 @@ func (db *DB) executeReadQuery(ctx context.Context, query Query) (QueryResult, e
 
 // getColumnTypes returns the column types for a read query.
 //
-// It tryes to get the column types from the result, but if it has empty
-// types, it tries infering them from the first row following the SQLite
+// It tries to get the column types from the result, but if it has empty
+// types, it tries inferring them from the first row following the SQLite
 // datatypes documentation https://www.sqlite.org/datatype3.html.
 func (db *DB) getColumnTypes(result *sql.Rows, singleRow []any) ([]string, error) {
 	types, err := result.ColumnTypes()
