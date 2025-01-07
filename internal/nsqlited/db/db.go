@@ -46,7 +46,7 @@ type DB struct {
 	transactionsMutex       sync.Mutex
 	transactionsMonitorStop chan any
 	writeMu                 sync.Mutex
-	wg                      sync.WaitGroup
+	closeWg                 sync.WaitGroup
 }
 
 // transactionData holds a *sql.Tx and the last time it was accessed.
@@ -135,10 +135,10 @@ func NewDB(config Config) (*DB, error) {
 		transactions:            make(map[string]transactionData),
 		transactionsMutex:       sync.Mutex{},
 		transactionsMonitorStop: make(chan any),
-		wg:                      sync.WaitGroup{},
+		closeWg:                 sync.WaitGroup{},
 	}
 
-	db.wg.Add(1)
+	db.closeWg.Add(1)
 	go db.monitorIdleTransactions(config.TxIdleTimeout)
 
 	config.Logger.InfoNs(log.NsDatabase, "database started")
@@ -152,7 +152,7 @@ func (db *DB) IsInitialized() bool {
 
 // monitorIdleTransactions rolls back transactions not used within the timeout.
 func (db *DB) monitorIdleTransactions(timeout time.Duration) {
-	defer db.wg.Done()
+	defer db.closeWg.Done()
 	ticker := time.NewTicker(timeout)
 	defer ticker.Stop()
 
@@ -180,7 +180,7 @@ func (db *DB) monitorIdleTransactions(timeout time.Duration) {
 func (db *DB) Close() error {
 	close(db.transactionsMonitorStop)
 
-	db.wg.Wait()
+	db.closeWg.Wait()
 	db.transactionsMutex.Lock()
 	for txId, data := range db.transactions {
 		_ = data.tx.Rollback()
