@@ -457,12 +457,13 @@ func (db *DB) executeReadQuery(ctx context.Context, query Query) (QueryResult, e
 	values := [][]any{}
 	for result.Next() {
 		row := make([]any, len(columns))
-		scans := make([]any, len(columns))
-		for i := range scans {
-			scans[i] = &row[i]
+		rowPtrs := make([]any, len(columns))
+
+		for i := range rowPtrs {
+			rowPtrs[i] = &row[i]
 		}
 
-		if err = result.Scan(scans...); err != nil {
+		if err = result.Scan(rowPtrs...); err != nil {
 			return QueryResult{}, fmt.Errorf("failed to scan row: %w", err)
 		}
 
