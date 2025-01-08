@@ -13,6 +13,7 @@ type minuteData struct {
 	begins       atomic.Int64
 	commits      atomic.Int64
 	rollbacks    atomic.Int64
+	errors       atomic.Int64
 	httpRequests atomic.Int64
 }
 
@@ -110,6 +111,12 @@ func (db *DBStats) IncCommits() {
 func (db *DBStats) IncRollbacks() {
 	md := db.getOrCreateMinuteData()
 	md.rollbacks.Add(1)
+}
+
+// IncErrors increments the error counter for the current minute.
+func (db *DBStats) IncErrors() {
+	md := db.getOrCreateMinuteData()
+	md.errors.Add(1)
 }
 
 // IncHTTPRequests increments the HTTP requests counter for the current minute.

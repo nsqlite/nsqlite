@@ -270,6 +270,16 @@ func (db *DB) detectQueryType(ctx context.Context, query string) (queryType, err
 
 // Query executes an SQLite query.
 func (db *DB) Query(ctx context.Context, query Query) (QueryResult, error) {
+	res, err := db.query(ctx, query)
+	if err != nil {
+		db.DBStats.IncErrors()
+	}
+
+	return res, err
+}
+
+// query is the underlying logic for Query.
+func (db *DB) query(ctx context.Context, query Query) (QueryResult, error) {
 	typeOfQuery, err := db.detectQueryType(ctx, query.Query)
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("failed to detect query type: %w", err)

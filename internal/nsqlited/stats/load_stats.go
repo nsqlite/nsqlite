@@ -20,6 +20,7 @@ type Totals struct {
 	Begins       int64 `json:"begins"`
 	Commits      int64 `json:"commits"`
 	Rollbacks    int64 `json:"rollbacks"`
+	Errors       int64 `json:"errors"`
 	HTTPRequests int64 `json:"httpRequests"`
 }
 
@@ -30,6 +31,7 @@ type Stat struct {
 	Begins       int64  `json:"begins"`
 	Commits      int64  `json:"commits"`
 	Rollbacks    int64  `json:"rollbacks"`
+	Errors       int64  `json:"errors"`
 	HTTPRequests int64  `json:"httpRequests"`
 }
 
@@ -42,6 +44,7 @@ func (db *DBStats) LoadStats() LoadedStats {
 		totalBegins       int64
 		totalCommits      int64
 		totalRollbacks    int64
+		totalErrors       int64
 		totalHTTPRequests int64
 	)
 
@@ -54,6 +57,7 @@ func (db *DBStats) LoadStats() LoadedStats {
 		b := md.begins.Load()
 		c := md.commits.Load()
 		rb := md.rollbacks.Load()
+		er := md.errors.Load()
 		hr := md.httpRequests.Load()
 
 		totalReads += r
@@ -61,6 +65,7 @@ func (db *DBStats) LoadStats() LoadedStats {
 		totalBegins += b
 		totalCommits += c
 		totalRollbacks += rb
+		totalErrors += er
 		totalHTTPRequests += hr
 
 		allStats = append(allStats, Stat{
@@ -70,6 +75,7 @@ func (db *DBStats) LoadStats() LoadedStats {
 			Begins:       b,
 			Commits:      c,
 			Rollbacks:    rb,
+			Errors:       er,
 			HTTPRequests: hr,
 		})
 
@@ -89,6 +95,7 @@ func (db *DBStats) LoadStats() LoadedStats {
 			Begins:       totalBegins,
 			Commits:      totalCommits,
 			Rollbacks:    totalRollbacks,
+			Errors:       totalErrors,
 			HTTPRequests: totalHTTPRequests,
 		},
 		Stats:              allStats,
