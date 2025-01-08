@@ -19,7 +19,7 @@ func cmdStats(r *Repl, statsQty int) {
 	}
 
 	tw := styled.NewTableWriter()
-	tw.AppendHeader(table.Row{"Minute (UTC)", "Reads", "Writes", "Begins", "Commits", "Rollbacks", "Requests"})
+	tw.AppendHeader(table.Row{"Minute (UTC)", "Reads", "Writes", "Begins", "Commits", "Rollbacks", "Errors", "Requests"})
 
 	rows := []table.Row{}
 	for i, stat := range stats.Stats {
@@ -39,6 +39,7 @@ func cmdStats(r *Repl, statsQty int) {
 			numutil.IntWithCommas(stat.Begins),
 			numutil.IntWithCommas(stat.Commits),
 			numutil.IntWithCommas(stat.Rollbacks),
+			numutil.IntWithCommas(stat.Errors),
 			numutil.IntWithCommas(stat.HTTPRequests),
 		})
 	}
@@ -52,6 +53,7 @@ func cmdStats(r *Repl, statsQty int) {
 		numutil.IntWithCommas(stats.Totals.Begins),
 		numutil.IntWithCommas(stats.Totals.Commits),
 		numutil.IntWithCommas(stats.Totals.Rollbacks),
+		numutil.IntWithCommas(stats.Totals.Errors),
 		numutil.IntWithCommas(stats.Totals.HTTPRequests),
 	})
 
