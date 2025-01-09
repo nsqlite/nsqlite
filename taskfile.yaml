@@ -78,6 +78,10 @@ tasks:
       - ./dist/nsqlitebench
     cmd: go build -o ./dist/nsqlitebench ./cmd/nsqlitebench/.
 
+  lint:
+    desc: Run linter
+    cmds: golangci-lint run ./...
+
   test:
     desc: Run tests
     cmd: go test ./...
