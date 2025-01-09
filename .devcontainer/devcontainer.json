@@ -1,0 +1,42 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/debian
+{
+	"name": "NSQLite Dev Container",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"portsAttributes": {
+		"9876": {
+			"label": "NSQLite Server"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go",
+				"mhutchie.git-graph"
+			],
+			"settings": {
+				"editor.formatOnSave": true,
+				"editor.foldingStrategy": "indentation",
+				"files.eol": "\n",
+				"[json]": {
+					"editor.defaultFormatter": "vscode.json-language-features"
+				},
+				"[jsonc]": {
+					"editor.defaultFormatter": "vscode.json-language-features"
+				},
+				"[markdown]": {
+					"editor.defaultFormatter": "vscode.markdown-language-features"
+				},
+				"[go]": {
+					"editor.defaultFormatter": "golang.go"
+				},
+				"go.lintTool": "golangci-lint",
+				"go.lintFlags": [
+					"--fast"
+				]
+			}
+		}
+	}
+}
