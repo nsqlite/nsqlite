@@ -5,11 +5,9 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"portsAttributes": {
-		"9876": {
-			"label": "NSQLite Server"
-		}
-	},
+	"appPort": [
+		"9876:9876"
+	],
 	"mounts": [
 		"type=bind,source=${localEnv:HOME}/.ssh,target=/root/.ssh,readonly"
 	],
