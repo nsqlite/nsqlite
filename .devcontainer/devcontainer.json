@@ -10,6 +10,9 @@
 			"label": "NSQLite Server"
 		}
 	},
+	"mounts": [
+		"type=bind,source=${localEnv:HOME}/.ssh,target=/root/.ssh,readonly"
+	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
