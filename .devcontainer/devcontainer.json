@@ -15,7 +15,8 @@
 		"vscode": {
 			"extensions": [
 				"golang.go",
-				"mhutchie.git-graph"
+				"mhutchie.git-graph",
+				"Compile-TomaszKasperczyk.copy-to-llm"
 			],
 			"settings": {
 				"editor.formatOnSave": true,
@@ -36,6 +37,15 @@
 				"go.lintTool": "golangci-lint",
 				"go.lintFlags": [
 					"--fast"
+				],
+				"copyToLLM.extensions": [
+					".sh",
+					".mod",
+					".yaml",
+					".json",
+					".go",
+					".sql",
+					".md"
 				]
 			}
 		}
