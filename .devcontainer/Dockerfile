@@ -3,6 +3,7 @@ FROM debian:bookworm
 
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV GOBIN="/usr/local/gobin"
+ENV CGO_ENABLED=1
 ENV PATH="$PATH:/usr/local/go/bin:/usr/local/gobin"
 RUN mkdir -p /usr/local/gobin
 
@@ -11,7 +12,7 @@ COPY --from=golang /usr/local/go /usr/local/go
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y wget git sqlite3 && \
+    apt-get install -y gcc wget git sqlite3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install dependencies with go install
