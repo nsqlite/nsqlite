@@ -3,8 +3,6 @@ package db
 import (
 	"context"
 	"database/sql/driver"
-	"fmt"
-	"net/url"
 
 	"github.com/mattn/go-sqlite3"
 )
@@ -25,24 +23,21 @@ func newConnector(dbPath string, readOnly bool) (driver.Connector, error) {
 
 // Connect creates a new database connection with the NSQLite optimizations.
 func (c *connector) Connect(context.Context) (driver.Conn, error) {
-	// DSN optimizations supported in mattn/go-sqlite3s
-	qp := url.Values{}
-	qp.Add("_journal_mode", "WAL")
-	qp.Add("_busy_timeout", "5000")
-	qp.Add("_synchronous", "NORMAL")
-	qp.Add("_cache_size", "10000")
-	qp.Add("_foreign_keys", "true")
-	if c.isReadOnly {
-		qp.Add("_query_only", "true")
-	}
-
-	// Other optimizations that are not supported in mattn/go-sqlite3
 	optimizations := []string{
-		"PRAGMA temp_store = MEMORY;",
-		"PRAGMA mmap_size = 536870912;", // 512MB
+		"PRAGMA JOURNAL_MODE = WAL;",
+		"PRAGMA BUSY_TIMEOUT = 5000;",
+		"PRAGMA SYNCHRONOUS = NORMAL;",
+		"PRAGMA CACHE_SIZE = 10000;",
+		"PRAGMA FOREIGN_KEYS = true;",
+		"PRAGMA TEMP_STORE = MEMORY;",
+		"PRAGMA MMAP_SIZE = 536870912;", // 512MB
 	}
 
-	conn, err := c.driver.Open(fmt.Sprintf("file:%s?%s", c.dbPath, qp.Encode()))
+	if c.isReadOnly {
+		optimizations = append(optimizations, "PRAGMA QUERY_ONLY = true;")
+	}
+
+	conn, err := c.driver.Open("file:" + c.dbPath)
 	if err != nil {
 		return nil, err
 	}
