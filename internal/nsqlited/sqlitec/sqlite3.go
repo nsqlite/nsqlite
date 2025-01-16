@@ -1,11 +1,9 @@
-// Package sqlite provides a lightweight wrapper for the SQLite C library to
-// be used by NSQLite internally.
-//
-//   - https://www.sqlite.org/cintro.html
-//   - https://www.sqlite.org/c3ref/intro.html
 package sqlitec
 
-// #include "sqlite3.c"
+/*
+#cgo LDFLAGS: -Wl,--allow-multiple-definition
+#include "sqlite3.c"
+*/
 import "C"
 import (
 	"errors"
