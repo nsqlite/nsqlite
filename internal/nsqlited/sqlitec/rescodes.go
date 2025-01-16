@@ -1,9 +1,6 @@
 package sqlitec
 
-/*
-#cgo LDFLAGS: -Wl,--allow-multiple-definition
-#include "sqlite3.c"
-*/
+// #include "sqlite3.c"
 import "C"
 import "fmt"
 
