@@ -146,10 +146,13 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 	if columnCount == 0 {
 		hasNext := true
 		err = nil
-		for hasNext {
+		for {
 			hasNext, err = stmt.Step()
 			if err != nil {
 				return nil, fmt.Errorf("failed to step statement: %w", err)
+			}
+			if !hasNext {
+				break
 			}
 		}
 
@@ -169,10 +172,13 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 
 		hasNext := true
 		err = nil
-		for hasNext {
+		for {
 			hasNext, err = stmt.Step()
 			if err != nil {
 				return nil, fmt.Errorf("failed to step statement: %w", err)
+			}
+			if !hasNext {
+				break
 			}
 
 			row := make([]any, columnCount)
