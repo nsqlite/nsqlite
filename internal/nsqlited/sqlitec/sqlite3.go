@@ -8,17 +8,6 @@ package sqlitec
 /*
 #cgo LDFLAGS: -Wl,--allow-multiple-definition
 #include "sqlite3.c"
-#include <stdlib.h>
-
-// SQLITE_TRANSIENT is not accessible from Go, so we create a wrapper here.
-static int cust_sqlite3_bind_text(sqlite3_stmt *stmt, int n, char *p, int np) {
-  return sqlite3_bind_text(stmt, n, p, np, SQLITE_TRANSIENT);
-}
-
-// SQLITE_TRANSIENT is not accessible from Go, so we create a wrapper here.
-static int cust_sqlite3_bind_blob(sqlite3_stmt *stmt, int n, void *p, int np) {
-  return sqlite3_bind_blob(stmt, n, p, np, SQLITE_TRANSIENT);
-}
 */
 import "C"
 import (
@@ -424,6 +413,8 @@ func (stmt *Stmt) ColumnBlob(colIndex int) []byte {
 }
 
 // Finalize frees the resources associated with this statement.
+//
+// https://www.sqlite.org/c3ref/finalize.html
 func (stmt *Stmt) Finalize() error {
 	if stmt.cStmt == nil {
 		return nil
