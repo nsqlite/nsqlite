@@ -215,6 +215,7 @@ func (conn *Conn) Prepare(query string) (*Stmt, error) {
 	if resCode != SQLITE_OK {
 		return nil, fmt.Errorf("failed to prepare statement: %s: %s", getResCodeStr(resCode), conn.getLastError())
 	}
+
 	return &Stmt{conn: conn, cStmt: cStmt}, nil
 }
 
@@ -227,7 +228,7 @@ func (stmt *Stmt) ReadOnly() bool {
 
 // BindParameterCount returns the number of parameters in the prepared statement.
 //
-// https://www.sqlite.org/c3ref/bind_count.html
+// https://www.sqlite.org/c3ref/bind_parameter_count.html
 func (stmt *Stmt) BindParameterCount() int {
 	return int(C.sqlite3_bind_parameter_count(stmt.cStmt))
 }
