@@ -203,23 +203,6 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 	}, nil
 }
 
-// Exec executes the given SQL query on the SQLite database connection
-// from start to finish, without returning any data.
-//
-// https://www.sqlite.org/c3ref/exec.html
-func (conn *Conn) Exec(query string) error {
-	cQuery := C.CString(query)
-	defer C.free(unsafe.Pointer(cQuery))
-
-	var errMsg *C.char
-	resCode := C.sqlite3_exec(conn.cDB, cQuery, nil, nil, &errMsg)
-	if resCode != SQLITE_OK {
-		return fmt.Errorf("failed to execute query: %s: %s", getResCodeStr(resCode), C.GoString(errMsg))
-	}
-
-	return nil
-}
-
 // Prepare compiles the given SQL query into a prepared statement.
 //
 // https://www.sqlite.org/c3ref/prepare.html
