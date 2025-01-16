@@ -8,7 +8,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 	"unsafe"
 )
@@ -91,6 +90,12 @@ func (conn *Conn) RowsAffected() int64 {
 	return int64(C.sqlite3_changes(conn.cDB))
 }
 
+// NamedParameter represents a named parameter (?NNN, :VVV, @VVV, $VVV) in a SQL query.
+type NamedParameter struct {
+	Name  string
+	Value any
+}
+
 // QueryOrExecResult represents the result for QueryOrExec.
 type QueryOrExecResult struct {
 	Time         time.Duration
@@ -104,7 +109,7 @@ type QueryOrExecResult struct {
 // QueryOrExec executes the given SQL query on the SQLite database connection
 // from start to finish, returning the result of the query for both write and
 // read operations.
-func (conn *Conn) QueryOrExec(query string) (*QueryOrExecResult, error) {
+func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResult, error) {
 	start := time.Now()
 
 	stmt, err := conn.Prepare(query)
@@ -121,9 +126,22 @@ func (conn *Conn) QueryOrExec(query string) (*QueryOrExecResult, error) {
 	var rows [][]any
 	columnCount := stmt.ColumnCount()
 
-	// Bind parameters
-	// Detect if is read or write depending on the number of columns in the result
-	// Scan the result values
+	for i, param := range parameters {
+		switch v := param.(type) {
+		case NamedParameter:
+			index := stmt.BindParameterIndex(v.Name)
+			if index == 0 {
+				return nil, fmt.Errorf("failed to find named parameter: %s", v.Name)
+			}
+			if err := stmt.BindDynamic(index, v.Value); err != nil {
+				return nil, fmt.Errorf("failed to bind named parameter: %w", err)
+			}
+		default:
+			if err := stmt.BindDynamic(i+1, param); err != nil {
+				return nil, fmt.Errorf("failed to bind parameter: %w", err)
+			}
+		}
+	}
 
 	if columnCount == 0 {
 		hasNext := true
@@ -146,7 +164,7 @@ func (conn *Conn) QueryOrExec(query string) (*QueryOrExecResult, error) {
 
 		for i := 0; i < columnCount; i++ {
 			columns[i] = stmt.ColumnName(i)
-			types[i] = stmt.ColumnType(i)
+			types[i] = stmt.ColumnDecltype(i)
 		}
 
 		hasNext := true
@@ -159,18 +177,11 @@ func (conn *Conn) QueryOrExec(query string) (*QueryOrExecResult, error) {
 
 			row := make([]any, columnCount)
 			for i := 0; i < columnCount; i++ {
-				switch strings.ToLower(types[i]) {
-				case "integer":
-					row[i] = stmt.ColumnInt(i)
-				case "real":
-					row[i] = stmt.ColumnFloat64(i)
-				case "text":
-					row[i] = stmt.ColumnText(i)
-				case "blob":
-					row[i] = stmt.ColumnBlob(i)
-				default:
-					row[i] = nil
+				col, err := stmt.ColumnDynamic(i)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get column value: %w", err)
 				}
+				row[i] = col
 			}
 			rows = append(rows, row)
 		}
@@ -225,10 +236,72 @@ func (stmt *Stmt) ReadOnly() bool {
 	return C.sqlite3_stmt_readonly(stmt.cStmt) != 0
 }
 
+// BindParameterCount returns the number of parameters in the prepared statement.
+//
+// https://www.sqlite.org/c3ref/bind_count.html
+func (stmt *Stmt) BindParameterCount() int {
+	return int(C.sqlite3_bind_parameter_count(stmt.cStmt))
+}
+
+// BindParameterName returns the name of the parameter at the given index.
+//
+// https://www.sqlite.org/c3ref/bind_parameter_name.html
+func (stmt *Stmt) BindParameterName(index int) string {
+	return C.GoString(C.sqlite3_bind_parameter_name(stmt.cStmt, C.int(index)))
+}
+
+// BindParameterIndex returns the index of the parameter with the given name.
+//
+// https://www.sqlite.org/c3ref/bind_parameter_index.html
+func (stmt *Stmt) BindParameterIndex(name string) int {
+	cName := C.CString(name)
+	defer C.free(unsafe.Pointer(cName))
+
+	return int(C.sqlite3_bind_parameter_index(stmt.cStmt, cName))
+}
+
+// BindDynamic binds a parameter at the given index depending on the type of the value.
+func (stmt *Stmt) BindDynamic(index int, value any) error {
+	switch v := value.(type) {
+	case int8:
+		return stmt.BindInt(index, int32(v))
+	case uint8:
+		return stmt.BindInt(index, int32(v))
+	case int16:
+		return stmt.BindInt(index, int32(v))
+	case uint16:
+		return stmt.BindInt(index, int32(v))
+	case int32:
+		return stmt.BindInt(index, v)
+	case uint32:
+		return stmt.BindInt(index, int32(v))
+	case int:
+		return stmt.BindInt64(index, int64(v))
+	case uint:
+		return stmt.BindInt64(index, int64(v))
+	case int64:
+		return stmt.BindInt64(index, v)
+	case uint64:
+		return stmt.BindInt64(index, int64(v))
+	case float64:
+		return stmt.BindDouble(index, v)
+	case float32:
+		return stmt.BindDouble(index, float64(v))
+	case string:
+		return stmt.BindText(index, v)
+	case []byte:
+		return stmt.BindBlob(index, v)
+	case nil:
+		return stmt.BindNull(index)
+	default:
+		return fmt.Errorf("unsupported bind %T type: %v", value, value)
+	}
+}
+
 // BindInt binds an int parameter at the given index.
 //
 // https://www.sqlite.org/c3ref/bind_blob.html
-func (stmt *Stmt) BindInt(index int, value int) error {
+func (stmt *Stmt) BindInt(index int, value int32) error {
 	if stmt.cStmt == nil {
 		return fmt.Errorf("cannot bind to a nil statement")
 	}
@@ -255,10 +328,10 @@ func (stmt *Stmt) BindInt64(index int, value int64) error {
 	return nil
 }
 
-// BindFloat64 binds a float64 parameter at the given index.
+// BindDouble binds a float64 parameter at the given index.
 //
 // https://www.sqlite.org/c3ref/bind_blob.html
-func (stmt *Stmt) BindFloat64(index int, value float64) error {
+func (stmt *Stmt) BindDouble(index int, value float64) error {
 	if stmt.cStmt == nil {
 		return fmt.Errorf("cannot bind to a nil statement")
 	}
@@ -352,11 +425,107 @@ func (stmt *Stmt) ColumnName(colIndex int) string {
 	return C.GoString(C.sqlite3_column_name(stmt.cStmt, C.int(colIndex)))
 }
 
-// ColumnType returns the type of the column at the given index.
+// ColumnNames returns the names of all columns in the current result row.
+func (stmt *Stmt) ColumnNames() []string {
+	count := stmt.ColumnCount()
+	if count == 0 {
+		return nil
+	}
+
+	names := make([]string, count)
+	for i := 0; i < count; i++ {
+		names[i] = stmt.ColumnName(i)
+	}
+
+	return names
+}
+
+// ColumnDecltype returns the declared type of the column at the given index.
 //
 // https://www.sqlite.org/c3ref/column_decltype.html
-func (stmt *Stmt) ColumnType(colIndex int) string {
+func (stmt *Stmt) ColumnDecltype(colIndex int) string {
 	return C.GoString(C.sqlite3_column_decltype(stmt.cStmt, C.int(colIndex)))
+}
+
+// ColumnDecltypes returns the declared types of all columns in the current result row.
+func (stmt *Stmt) ColumnDecltypes() []string {
+	count := stmt.ColumnCount()
+	if count == 0 {
+		return nil
+	}
+
+	types := make([]string, count)
+	for i := 0; i < count; i++ {
+		types[i] = stmt.ColumnDecltype(i)
+	}
+
+	return types
+}
+
+type ColumnType int
+
+const (
+	ColumnTypeInteger = ColumnType(C.SQLITE_INTEGER)
+	ColumnTypeFloat   = ColumnType(C.SQLITE_FLOAT)
+	ColumnTypeText    = ColumnType(C.SQLITE_TEXT)
+	ColumnTypeBlob    = ColumnType(C.SQLITE_BLOB)
+	ColumnTypeNull    = ColumnType(C.SQLITE_NULL)
+)
+
+// ColumnType returns the type of the column at the given index.
+// The return value can be used to decide which of interfaces
+// should be used to extract the column value.
+//
+// https://www.sqlite.org/c3ref/column_blob.html
+func (stmt *Stmt) ColumnType(colIndex int) ColumnType {
+	return ColumnType(C.sqlite3_column_type(stmt.cStmt, C.int(colIndex)))
+}
+
+// ColumnTypes returns the types of all columns in the current result row.
+// The return value can be used to decide which of interfaces
+// should be used to extract the column value.
+func (stmt *Stmt) ColumnTypes() []ColumnType {
+	count := stmt.ColumnCount()
+	if count == 0 {
+		return nil
+	}
+
+	types := make([]ColumnType, count)
+	for i := 0; i < count; i++ {
+		types[i] = stmt.ColumnType(i)
+	}
+
+	return types
+}
+
+// ColumnDynamic returns the column value at the given index depending on the
+// type of the column.
+//
+// https://www.sqlite.org/c3ref/column_blob.html
+func (stmt *Stmt) ColumnDynamic(colIndex int) (any, error) {
+	columnType := stmt.ColumnType(colIndex)
+	switch columnType {
+	case ColumnTypeInteger:
+		return stmt.ColumnInt(colIndex), nil
+	case ColumnTypeFloat:
+		return stmt.ColumnFloat64(colIndex), nil
+	case ColumnTypeText:
+		return stmt.ColumnText(colIndex), nil
+	case ColumnTypeBlob:
+		return stmt.ColumnBlob(colIndex), nil
+	case ColumnTypeNull:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unsupported column type: %d", columnType)
+	}
+}
+
+// ColumnBytes returns the number of bytes in the column value at the given index.
+// Useful for extracting the size of a blob or text column.
+//
+// https://www.sqlite.org/c3ref/column_blob.html
+func (stmt *Stmt) ColumnBytes(colIndex int) int {
+	return int(C.sqlite3_column_bytes(stmt.cStmt, C.int(colIndex)))
 }
 
 // ColumnInt returns the column value at the given index as int.
@@ -384,12 +553,17 @@ func (stmt *Stmt) ColumnFloat64(colIndex int) float64 {
 //
 // https://www.sqlite.org/c3ref/column_blob.html
 func (stmt *Stmt) ColumnText(colIndex int) string {
+	size := C.sqlite3_column_bytes(stmt.cStmt, C.int(colIndex))
+	if size <= 0 {
+		return ""
+	}
+
 	text := (*C.char)(unsafe.Pointer(C.sqlite3_column_text(stmt.cStmt, C.int(colIndex))))
 	if text == nil {
 		return ""
 	}
-	length := C.sqlite3_column_bytes(stmt.cStmt, C.int(colIndex))
-	return C.GoStringN(text, length)
+
+	return C.GoStringN(text, size)
 }
 
 // ColumnBlob returns the column value at the given index as a byte slice.
@@ -400,10 +574,12 @@ func (stmt *Stmt) ColumnBlob(colIndex int) []byte {
 	if size <= 0 {
 		return nil
 	}
+
 	dataPtr := C.sqlite3_column_blob(stmt.cStmt, C.int(colIndex))
 	if dataPtr == nil {
 		return nil
 	}
+
 	return C.GoBytes(dataPtr, size)
 }
 
