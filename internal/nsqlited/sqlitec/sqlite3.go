@@ -135,7 +135,7 @@ func (conn *Conn) Query(query string, parameters []QueryParam) (*QueryResult, er
 		}
 
 		if param.Name != "" {
-			index := stmt.BindParameterIndex(param.Name)
+			index := stmt.BindParameterIndexSafe(param.Name)
 			if index == 0 {
 				return nil, fmt.Errorf("failed to find named parameter index: %s", param.Name)
 			}
@@ -257,6 +257,30 @@ func (stmt *Stmt) BindParameterIndex(name string) int {
 	defer C.free(unsafe.Pointer(cName))
 
 	return int(C.sqlite3_bind_parameter_index(stmt.cStmt, cName))
+}
+
+// BindParameterIndexSafe tries to find the index of the parameter with the given name
+// using all prefixes (?, :, @, $) if no one is provided.
+func (stmt *Stmt) BindParameterIndexSafe(name string) int {
+	if name == "" {
+		return 0
+	}
+
+	prefixes := []string{":", "@", "$", "?"}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(name, prefix) {
+			return stmt.BindParameterIndex(name)
+		}
+	}
+
+	for _, prefix := range prefixes {
+		index := stmt.BindParameterIndex(prefix + name)
+		if index != 0 {
+			return index
+		}
+	}
+
+	return 0
 }
 
 // BindDynamic binds a parameter at the given index depending on the type of the value.
