@@ -83,7 +83,7 @@ func newConn(dsn string, postConnectQueries []string) (driver.Conn, error) {
 	}
 
 	for _, query := range postConnectQueries {
-		if _, err := conn.QueryOrExec(query, nil); err != nil {
+		if _, err := conn.Query(query, nil); err != nil {
 			return nil, fmt.Errorf(`failed to execute "%s" post-connect query: %w`, query, err)
 		}
 	}
