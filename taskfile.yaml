@@ -11,6 +11,12 @@ tasks:
       - go install ./cmd/nsqlite/.
       - go install ./cmd/nsqlited/.
 
+  build:
+    desc: Build all the binaries
+    cmds:
+      - task buildc
+      - task builds
+
   runc:
     desc: Build an run NSQLite CLI
     deps: [buildc]
@@ -28,7 +34,7 @@ tasks:
       - exclude: "**/*_test.go"
     generates:
       - ./dist/nsqlite
-    cmd: go build -o ./dist/nsqlite ./cmd/nsqlite/.
+    cmd: CGO_ENABLED=0 go build -o ./dist/nsqlite ./cmd/nsqlite/.
 
   devs:
     desc: Build and serve NSQLite Server with hot reload
@@ -53,7 +59,7 @@ tasks:
       - exclude: "**/*_test.go"
     generates:
       - ./dist/nsqlited
-    cmd: go build -o ./dist/nsqlited ./cmd/nsqlited/.
+    cmd: CGO_ENABLED=1 go build -o ./dist/nsqlited ./cmd/nsqlited/.
 
   lint:
     desc: Run linter
