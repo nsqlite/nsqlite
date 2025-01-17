@@ -1,0 +1,37 @@
+name: Lint and Test
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Lint the code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run lint on the dev container
+        uses: devcontainers/ci@v0.3
+        with:
+          imageName: ghcr.io/nsqlite/nsqlitedc
+          cacheFrom: ghcr.io/nsqlite/nsqlitedc
+          push: never
+          runCmd: task lint
+
+  test:
+    name: Test the code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests on the dev container
+        uses: devcontainers/ci@v0.3
+        with:
+          imageName: ghcr.io/nsqlite/nsqlitedc
+          cacheFrom: ghcr.io/nsqlite/nsqlitedc
+          push: never
+          runCmd: task test
