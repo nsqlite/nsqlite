@@ -13,6 +13,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure .ssh directory exists even if it's empty
+        run: mkdir -p /home/runner/.ssh
+
       - name: Run lint, test and build
         uses: devcontainers/ci@v0.3
         with:
