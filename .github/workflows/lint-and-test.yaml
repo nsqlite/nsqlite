@@ -12,8 +12,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Ensure .ssh directory exists even if it's empty
         run: mkdir -p /home/runner/.ssh
