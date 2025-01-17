@@ -8,6 +8,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unsafe"
 )
@@ -165,11 +166,7 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 		types = make([]string, columnCount)
 		rows = make([][]any, 0)
 
-		for i := 0; i < columnCount; i++ {
-			columns[i] = stmt.ColumnName(i)
-			types[i] = stmt.ColumnDecltype(i)
-		}
-
+		isFirstIter := true
 		hasNext := true
 		err = nil
 		for {
@@ -188,7 +185,14 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 					return nil, fmt.Errorf("failed to get column value: %w", err)
 				}
 				row[i] = col
+
+				if isFirstIter {
+					columns[i] = stmt.ColumnName(i)
+					types[i] = stmt.ColumnDeclTypeOrValtype(i, col)
+				}
 			}
+
+			isFirstIter = false
 			rows = append(rows, row)
 		}
 	}
@@ -434,22 +438,31 @@ func (stmt *Stmt) ColumnNames() []string {
 //
 // https://www.sqlite.org/c3ref/column_decltype.html
 func (stmt *Stmt) ColumnDecltype(colIndex int) string {
-	return C.GoString(C.sqlite3_column_decltype(stmt.cStmt, C.int(colIndex)))
+	return strings.ToUpper(C.GoString(C.sqlite3_column_decltype(stmt.cStmt, C.int(colIndex))))
 }
 
-// ColumnDecltypes returns the declared types of all columns in the current result row.
-func (stmt *Stmt) ColumnDecltypes() []string {
-	count := stmt.ColumnCount()
-	if count == 0 {
-		return nil
+// ColumnDeclTypeOrValtype returns the declared type of the column at the given index
+// and if it is empty, it returns a fallback type based on the provided value.
+func (stmt *Stmt) ColumnDeclTypeOrValtype(colIndex int, value any) string {
+	declType := stmt.ColumnDecltype(colIndex)
+	if declType != "" {
+		return declType
 	}
 
-	types := make([]string, count)
-	for i := 0; i < count; i++ {
-		types[i] = stmt.ColumnDecltype(i)
+	switch value.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return "INTEGER"
+	case float32, float64:
+		return "REAL"
+	case bool:
+		return "BOOLEAN"
+	case []byte:
+		return "BLOB"
+	case string:
+		return "TEXT"
+	default:
+		return ""
 	}
-
-	return types
 }
 
 type ColumnType int
@@ -469,23 +482,6 @@ const (
 // https://www.sqlite.org/c3ref/column_blob.html
 func (stmt *Stmt) ColumnType(colIndex int) ColumnType {
 	return ColumnType(C.sqlite3_column_type(stmt.cStmt, C.int(colIndex)))
-}
-
-// ColumnTypes returns the types of all columns in the current result row.
-// The return value can be used to decide which of interfaces
-// should be used to extract the column value.
-func (stmt *Stmt) ColumnTypes() []ColumnType {
-	count := stmt.ColumnCount()
-	if count == 0 {
-		return nil
-	}
-
-	types := make([]ColumnType, count)
-	for i := 0; i < count; i++ {
-		types[i] = stmt.ColumnType(i)
-	}
-
-	return types
 }
 
 // ColumnDynamic returns the column value at the given index depending on the
