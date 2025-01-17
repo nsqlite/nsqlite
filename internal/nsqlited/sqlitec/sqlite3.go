@@ -167,6 +167,11 @@ func (conn *Conn) Query(query string, parameters []QueryParam) (*QueryResult, er
 		types = make([]string, columnCount)
 		rows = make([][]any, 0)
 
+		for i := 0; i < columnCount; i++ {
+			columns[i] = stmt.ColumnName(i)
+			types[i] = stmt.ColumnDecltype(i)
+		}
+
 		isFirstIter := true
 		hasNext := true
 		err = nil
@@ -187,9 +192,8 @@ func (conn *Conn) Query(query string, parameters []QueryParam) (*QueryResult, er
 				}
 				row[i] = col
 
-				if isFirstIter {
-					columns[i] = stmt.ColumnName(i)
-					types[i] = stmt.ColumnDeclTypeOrValtype(i, col)
+				if isFirstIter && types[i] == "" {
+					types[i] = stmt.ColumnValueType(col)
 				}
 			}
 
@@ -447,14 +451,8 @@ func (stmt *Stmt) ColumnDecltype(colIndex int) string {
 	return strings.ToUpper(C.GoString(C.sqlite3_column_decltype(stmt.cStmt, C.int(colIndex))))
 }
 
-// ColumnDeclTypeOrValtype returns the declared type of the column at the given index
-// and if it is empty, it returns a fallback type based on the provided value.
-func (stmt *Stmt) ColumnDeclTypeOrValtype(colIndex int, value any) string {
-	declType := stmt.ColumnDecltype(colIndex)
-	if declType != "" {
-		return declType
-	}
-
+// ColumnValueType returns the inferred type of the given value.
+func (stmt *Stmt) ColumnValueType(value any) string {
 	switch value.(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		return "INTEGER"
