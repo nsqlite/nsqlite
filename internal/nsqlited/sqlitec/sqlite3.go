@@ -91,14 +91,14 @@ func (conn *Conn) RowsAffected() int64 {
 	return int64(C.sqlite3_changes(conn.cDB))
 }
 
-// NamedParameter represents a named parameter (?NNN, :VVV, @VVV, $VVV) in a SQL query.
-type NamedParameter struct {
+// QueryParam represents a named (?NNN, :VVV, @VVV, $VVV) or nameless (?) parameter in a SQL query.
+type QueryParam struct {
 	Name  string
 	Value any
 }
 
-// QueryOrExecResult represents the result for QueryOrExec.
-type QueryOrExecResult struct {
+// QueryResult represents the result for Query.
+type QueryResult struct {
 	Time         time.Duration
 	LastInsertID int64
 	RowsAffected int64
@@ -107,10 +107,10 @@ type QueryOrExecResult struct {
 	Rows         [][]any
 }
 
-// QueryOrExec executes the given SQL query on the SQLite database connection
-// from start to finish, returning the result of the query for both write and
-// read operations.
-func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResult, error) {
+// Query executes the given SQL query on the SQLite database connection
+// from start to finish, returning the result of the query for both
+// write and read operations.
+func (conn *Conn) Query(query string, parameters []QueryParam) (*QueryResult, error) {
 	start := time.Now()
 
 	stmt, err := conn.Prepare(query)
@@ -128,18 +128,19 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 	columnCount := stmt.ColumnCount()
 
 	for i, param := range parameters {
-		switch v := param.(type) {
-		case NamedParameter:
-			index := stmt.BindParameterIndex(v.Name)
+		if param.Name == "" {
+			if err := stmt.BindDynamic(i+1, param.Value); err != nil {
+				return nil, fmt.Errorf("failed to bind nameless parameter: %w", err)
+			}
+		}
+
+		if param.Name != "" {
+			index := stmt.BindParameterIndex(param.Name)
 			if index == 0 {
-				return nil, fmt.Errorf("failed to find named parameter: %s", v.Name)
+				return nil, fmt.Errorf("failed to find named parameter index: %s", param.Name)
 			}
-			if err := stmt.BindDynamic(index, v.Value); err != nil {
+			if err := stmt.BindDynamic(index, param.Value); err != nil {
 				return nil, fmt.Errorf("failed to bind named parameter: %w", err)
-			}
-		default:
-			if err := stmt.BindDynamic(i+1, param); err != nil {
-				return nil, fmt.Errorf("failed to bind parameter: %w", err)
 			}
 		}
 	}
@@ -197,7 +198,7 @@ func (conn *Conn) QueryOrExec(query string, parameters []any) (*QueryOrExecResul
 		}
 	}
 
-	return &QueryOrExecResult{
+	return &QueryResult{
 		Time:         time.Since(start),
 		LastInsertID: lastInsertID,
 		RowsAffected: rowsAffected,
