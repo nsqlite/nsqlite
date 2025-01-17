@@ -185,7 +185,7 @@ func (db *DB) txIdleMonitor(timeout time.Duration) {
 			if db.txId.Load() == "" {
 				continue
 			}
-			if time.Now().Sub(db.txIdLastUsed.Load()) > timeout {
+			if time.Since(db.txIdLastUsed.Load()) > timeout {
 				_, _ = db.executeRollbackQuery(context.Background(), db.txId.Load())
 			}
 		}
