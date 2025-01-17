@@ -12,73 +12,73 @@ import (
 )
 
 func cmdQuery(r *Repl, input string) {
-	tw := styled.NewTableWriter()
 
 	res, err := r.client.SendQuery(context.TODO(), nsqlitehttp.Query{
 		TxId:  r.txId,
 		Query: input,
 	})
 	if err != nil && res.Error == "" {
+		tw := styled.NewTableWriter()
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{err.Error()})
+		fmt.Println(tw.Render())
 	}
 
-	if res.Type == nsqlitehttp.QueryResponseError {
+	isError := res.Error != ""
+	hasReads := len(res.Columns) > 0
+	hasWrites := res.RowsAffected > 0
+	hasTxId := res.TxId != ""
+	isOk := !isError && !hasReads && !hasWrites
+
+	if isError {
+		tw := styled.NewTableWriter()
 		tw.AppendHeader(table.Row{"Error"})
 		tw.AppendRow(table.Row{r.cleanError(res.Error)})
+		fmt.Println(tw.Render())
 
 		if strings.Contains(res.Error, db.ErrTxNotFound.Error()) {
 			r.setTxId("")
 		}
 	}
 
-	if res.Type == nsqlitehttp.QueryResponseOK {
+	if hasTxId {
+		tw := styled.NewTableWriter()
+		tw.AppendHeader(table.Row{"OK"})
+		tw.AppendRow(table.Row{"Transaction started"})
+		fmt.Println(tw.Render())
+		r.setTxId(res.TxId)
+	}
+
+	if isOk {
+		tw := styled.NewTableWriter()
 		tw.AppendHeader(table.Row{"OK"})
 		tw.AppendRow(table.Row{"OK"})
+		fmt.Println(tw.Render())
 	}
 
-	if res.Type == nsqlitehttp.QueryResponseBegin {
-		if res.TxId == "" {
-			tw.AppendHeader(table.Row{"Error"})
-			tw.AppendRow(table.Row{"No transaction ID returned"})
-		}
-		if res.TxId != "" {
-			r.setTxId(res.TxId)
-			tw.AppendHeader(table.Row{"OK"})
-			tw.AppendRow(table.Row{"Transaction started"})
-		}
-	}
-
-	if res.Type == nsqlitehttp.QueryResponseCommit {
-		r.setTxId("")
-		tw.AppendHeader(table.Row{"OK"})
-		tw.AppendRow(table.Row{"Transaction committed"})
-	}
-
-	if res.Type == nsqlitehttp.QueryResponseRollback {
-		r.setTxId("")
-		tw.AppendHeader(table.Row{"OK"})
-		tw.AppendRow(table.Row{"Transaction rolled back"})
-	}
-
-	if res.Type == nsqlitehttp.QueryResponseWrite {
+	if hasWrites {
+		tw := styled.NewTableWriter()
 		tw.AppendHeader(table.Row{"-", "Rows Affected", "Last Insert ID"})
 		tw.AppendRow(table.Row{"OK", res.RowsAffected, res.LastInsertID})
+		fmt.Println(tw.Render())
 	}
 
-	if res.Type == nsqlitehttp.QueryResponseRead {
+	if hasReads {
+		tw := styled.NewTableWriter()
+
 		header := table.Row{}
 		for _, col := range res.Columns {
 			header = append(header, col)
 		}
 		tw.AppendHeader(header)
 
-		for _, value := range res.Values {
-			tw.AppendRow(value)
+		for _, row := range res.Rows {
+			tw.AppendRow(row)
 		}
+
+		fmt.Println(tw.Render())
 	}
 
-	fmt.Println(tw.Render())
 	if res.Time > 0 {
 		styled.DimmedColor().Printf("Time: %f seconds\n", res.Time)
 	}
