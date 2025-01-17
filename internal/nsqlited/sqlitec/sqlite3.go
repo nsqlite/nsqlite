@@ -258,6 +258,11 @@ func (stmt *Stmt) BindParameterIndex(name string) int {
 // BindDynamic binds a parameter at the given index depending on the type of the value.
 func (stmt *Stmt) BindDynamic(index int, value any) error {
 	switch v := value.(type) {
+	case bool:
+		if v {
+			return stmt.BindInt(index, 1)
+		}
+		return stmt.BindInt(index, 0)
 	case int8:
 		return stmt.BindInt(index, int32(v))
 	case uint8:
