@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jedib0t/go-pretty/v6 v6.6.5
 	github.com/matthewhartstonge/argon2 v1.1.1
-	github.com/nsqlite/nsqlitego v0.1.9
+	github.com/nsqlite/nsqlitego v0.1.10
 	github.com/orsinium-labs/enum v1.4.0
 	github.com/peterh/liner v1.2.2
 	github.com/stretchr/testify v1.10.0
