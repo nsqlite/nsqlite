@@ -13,6 +13,14 @@ import (
 	"unsafe"
 )
 
+// getResCodeStr returns the string representation of the SQLite result code
+// in format "code: description".
+//
+// https://www.sqlite.org/c3ref/errcode.html
+func getResCodeStr(resCode C.int) string {
+	return fmt.Sprintf("%v: %s", resCode, C.GoString(C.sqlite3_errstr(resCode)))
+}
+
 // Conn represents a high-level connection to a SQLite database.
 //
 // https://www.sqlite.org/c3ref/sqlite3.html
@@ -45,7 +53,7 @@ func Open(filePath string) (*Conn, error) {
 
 	var db *C.sqlite3
 	resCode := C.sqlite3_open(cFilePath, &db)
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		errMsg := (&Conn{cDB: db}).getLastError()
 		_ = C.sqlite3_close(db)
 		return nil, fmt.Errorf("failed to open database: %s: %s", getResCodeStr(resCode), errMsg)
@@ -66,7 +74,7 @@ func (conn *Conn) Close() error {
 	// languages that are garbage collected, and where the order in which
 	// destructors are called is arbitrary.
 	resCode := C.sqlite3_close_v2(conn.cDB)
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to close database: %s: %s", getResCodeStr(resCode), conn.getLastError())
 	}
 	conn.cDB = nil
@@ -221,7 +229,7 @@ func (conn *Conn) Prepare(query string) (*Stmt, error) {
 
 	var cStmt *C.sqlite3_stmt
 	resCode := C.sqlite3_prepare_v2(conn.cDB, cQuery, C.int(-1), &cStmt, nil)
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return nil, fmt.Errorf("failed to prepare statement: %s: %s", getResCodeStr(resCode), conn.getLastError())
 	}
 
@@ -335,7 +343,7 @@ func (stmt *Stmt) BindInt(index int, value int32) error {
 	}
 
 	resCode := C.sqlite3_bind_int(stmt.cStmt, C.int(index), C.int(value))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind int: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -350,7 +358,7 @@ func (stmt *Stmt) BindInt64(index int, value int64) error {
 	}
 
 	resCode := C.sqlite3_bind_int64(stmt.cStmt, C.int(index), C.sqlite3_int64(value))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind int64: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -365,7 +373,7 @@ func (stmt *Stmt) BindDouble(index int, value float64) error {
 	}
 
 	resCode := C.sqlite3_bind_double(stmt.cStmt, C.int(index), C.double(value))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind float64: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -382,7 +390,7 @@ func (stmt *Stmt) BindText(index int, value string) error {
 	defer C.free(unsafe.Pointer(cStr))
 
 	resCode := C.cust_sqlite3_bind_text(stmt.cStmt, C.int(index), cStr, C.int(-1))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind text: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -400,7 +408,7 @@ func (stmt *Stmt) BindBlob(index int, data []byte) error {
 	}
 
 	resCode := C.cust_sqlite3_bind_blob(stmt.cStmt, C.int(index), unsafe.Pointer(&data[0]), C.int(len(data)))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind blob: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -415,7 +423,7 @@ func (stmt *Stmt) BindNull(index int) error {
 	}
 
 	resCode := C.sqlite3_bind_null(stmt.cStmt, C.int(index))
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to bind null: %s", getResCodeStr(resCode))
 	}
 	return nil
@@ -428,11 +436,11 @@ func (stmt *Stmt) BindNull(index int) error {
 func (stmt *Stmt) Step() (bool, error) {
 	resCode := C.sqlite3_step(stmt.cStmt)
 
-	if resCode == SQLITE_DONE {
+	if resCode == C.SQLITE_DONE {
 		return false, nil
 	}
 
-	if resCode == SQLITE_ROW {
+	if resCode == C.SQLITE_ROW {
 		return true, nil
 	}
 
@@ -606,7 +614,7 @@ func (stmt *Stmt) Finalize() error {
 	}
 
 	resCode := C.sqlite3_finalize(stmt.cStmt)
-	if resCode != SQLITE_OK {
+	if resCode != C.SQLITE_OK {
 		return fmt.Errorf("failed to finalize statement: %s: %s", getResCodeStr(resCode), C.GoString(C.sqlite3_errmsg(stmt.conn.cDB)))
 	}
 	stmt.cStmt = nil
