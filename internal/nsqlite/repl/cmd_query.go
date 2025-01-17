@@ -11,11 +11,11 @@ import (
 	"github.com/nsqlite/nsqlitego/nsqlitehttp"
 )
 
-func cmdQuery(r *Repl, input string) {
-
+func cmdQuery(r *Repl, input string, params []nsqlitehttp.QueryParam) {
 	res, err := r.client.SendQuery(context.TODO(), nsqlitehttp.Query{
-		TxId:  r.txId,
-		Query: input,
+		TxId:   r.txId,
+		Query:  input,
+		Params: params,
 	})
 	if err != nil && res.Error == "" {
 		tw := styled.NewTableWriter()

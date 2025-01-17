@@ -2,6 +2,7 @@ package repl
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -10,21 +11,33 @@ import (
 
 type dotCmd struct {
 	name         string
+	autocomplete string
 	help         string
-	autocomplete bool
+	args         string
 }
 
 func cmdHelpCommands() []dotCmd {
-	return []dotCmd{
-		{name: ".tables", help: "List all tables in the database", autocomplete: true},
-		{name: ".stats", help: "Shows the server stats of last 5 minutes", autocomplete: true},
-		{name: ".stats N", help: "Shows the server stats of last N minutes", autocomplete: false},
-		{name: ".clear", help: "Clear the terminal screen", autocomplete: true},
-		{name: ".help", help: "Show the help message", autocomplete: true},
-		{name: ".quit", help: "Exit the application", autocomplete: true},
-		{name: ".exit", help: "Exit the application", autocomplete: true},
+	cmds := []dotCmd{
+		{name: ".count [table_name]", autocomplete: ".count", help: "Count the number of rows in a table", args: "table_name (required)"},
+		{name: ".columns [table_name]", autocomplete: ".columns", help: "List all columns in a table", args: "table_name (required)"},
+		{name: ".stats [minutes]", autocomplete: ".stats", help: "Shows the server stats of last specified minutes", args: "minutes (optional, default 5)"},
+
+		{name: ".tables", autocomplete: ".tables", help: "List all tables in the database"},
+		{name: ".indexes", autocomplete: ".indexes", help: "List all indexes in the database"},
+		{name: ".functions", autocomplete: ".functions", help: "List all functions in the database"},
+		{name: ".schema", autocomplete: ".schema", help: "List all schema in the database"},
+		{name: ".clear", autocomplete: ".clear", help: "Clear the terminal screen"},
+		{name: ".help", autocomplete: ".help", help: "Show the help message"},
+		{name: ".quit", autocomplete: ".quit", help: "Exit the application"},
+		{name: ".exit", autocomplete: ".exit", help: "Exit the application"},
 		{name: "CTRL+c", help: "Exit the application"},
 	}
+
+	sort.Slice(cmds, func(i, j int) bool {
+		return cmds[i].name < cmds[j].name
+	})
+
+	return cmds
 }
 
 func cmdHelp() {
@@ -32,10 +45,10 @@ func cmdHelp() {
 	cmds := cmdHelpCommands()
 
 	tw := styled.NewTableWriter()
-	tw.AppendHeader(table.Row{"Command", "Description"})
+	tw.AppendHeader(table.Row{"Command", "Description", "Arguments"})
 
 	for _, cmd := range cmds {
-		tw.AppendRow(table.Row{cmd.name, cmd.help})
+		tw.AppendRow(table.Row{cmd.name, cmd.help, cmd.args})
 	}
 
 	fmt.Println(tw.Render())
@@ -55,8 +68,8 @@ func cmdHelpCompleter(line string) []string {
 	}
 
 	for _, cmd := range cmdHelpCommands() {
-		if cmd.autocomplete {
-			suggestions = append(suggestions, cmd.name)
+		if cmd.autocomplete != "" {
+			suggestions = append(suggestions, cmd.autocomplete)
 		}
 	}
 

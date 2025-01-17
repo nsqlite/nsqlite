@@ -95,7 +95,59 @@ func (r *Repl) Start() error {
 			}
 
 			if input == ".tables" {
-				cmdQuery(r, `SELECT name FROM sqlite_master WHERE type = "table"`)
+				cmdQuery(r, `
+					SELECT name
+					FROM sqlite_master
+					WHERE type IN ('table','view')
+					ORDER BY 1
+				`, nil)
+				continue
+			}
+
+			if strings.HasPrefix(input, ".columns") {
+				tableName := strings.TrimSpace(strings.TrimPrefix(input, ".columns"))
+				if tableName == "" {
+					continue
+				}
+
+				cmdQuery(r, `SELECT name FROM pragma_table_info(:table_name)`, []nsqlitehttp.QueryParam{
+					{Name: "table_name", Value: tableName},
+				})
+				continue
+			}
+
+			if strings.HasPrefix(input, ".count") {
+				tableName := strings.TrimSpace(strings.TrimPrefix(input, ".count"))
+				if tableName == "" {
+					continue
+				}
+
+				cmdQuery(r, `SELECT COUNT(*) FROM `+tableName, nil)
+				continue
+			}
+
+			if input == ".indexes" {
+				cmdQuery(r, `
+					SELECT name
+					FROM sqlite_master
+					WHERE type = 'index'
+					ORDER BY 1
+				`, nil)
+				continue
+			}
+
+			if input == ".functions" {
+				cmdQuery(r, `
+					SELECT name
+					FROM sqlite_master
+					WHERE type = 'function'
+					ORDER BY 1
+				`, nil)
+				continue
+			}
+
+			if input == ".schema" {
+				cmdQuery(r, `SELECT sql FROM sqlite_master`, nil)
 				continue
 			}
 
@@ -118,7 +170,7 @@ func (r *Repl) Start() error {
 				continue
 			}
 
-			cmdQuery(r, input)
+			cmdQuery(r, input, nil)
 		}
 	}
 }
