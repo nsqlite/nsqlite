@@ -93,8 +93,8 @@ func (conn *Conn) RowsAffected() int64 {
 
 // QueryParam represents a named (?NNN, :VVV, @VVV, $VVV) or nameless (?) parameter in a SQL query.
 type QueryParam struct {
-	Name  string
-	Value any
+	Name  string `json:"name,omitempty"`
+	Value any    `json:"value"`
 }
 
 // QueryResult represents the result for Query.
