@@ -58,7 +58,7 @@ func cmdStats(r *Repl, statsQty int) {
 	})
 
 	fmt.Println(tw.Render())
-	styled.DimmedColor().Printf("Showing the last 5 minutes of stats\n")
+	styled.DimmedColor().Printf("Showing the last %d minutes of stats\n", statsQty)
 	styled.DimmedColor().Printf("Uptime: %s\n", stats.Uptime)
 	fmt.Println()
 }
