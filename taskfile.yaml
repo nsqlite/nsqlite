@@ -2,18 +2,16 @@
 
 version: "3"
 
-interval: 500ms
-
 tasks:
+  build:
+    desc: Build the binaries for all platforms
+    cmd: chmod +x ./build.ts && ./build.ts
+
   install:
     desc: Build and install binaries in local system using go install
     cmds:
       - go install ./cmd/nsqlite/.
       - go install ./cmd/nsqlited/.
-
-  build:
-    desc: Build the binaries for all platforms
-    cmd: chmod +x ./build.sh && ./build.sh
 
   runc:
     desc: Build an run NSQLite CLI
@@ -22,23 +20,7 @@ tasks:
 
   buildc:
     desc: Build NSQLite CLI
-    sources:
-      - "**/*.go"
-      - exclude: ./internal/nsqlited/**/*
-      - exclude: ./.git/**/*
-      - exclude: ./temp/**/*
-      - exclude: ./tmp/**/*
-      - exclude: ./dist/**/*
-      - exclude: "**/*_test.go"
-    generates:
-      - ./dist/nsqlite
     cmd: go build -o ./dist/nsqlite ./cmd/nsqlite/.
-
-  devs:
-    desc: Build and serve NSQLite Server with hot reload
-    watch: true
-    deps: [builds]
-    cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
   runs:
     desc: Build and run NSQLite Server
@@ -47,16 +29,6 @@ tasks:
 
   builds:
     desc: Build NSQLite Server
-    sources:
-      - "**/*.go"
-      - exclude: ./internal/nsqlite/**/*
-      - exclude: ./.git/**/*
-      - exclude: ./temp/**/*
-      - exclude: ./tmp/**/*
-      - exclude: ./dist/**/*
-      - exclude: "**/*_test.go"
-    generates:
-      - ./dist/nsqlited
     cmd: go build -o ./dist/nsqlited ./cmd/nsqlited/.
 
   lint:

@@ -1,0 +1,60 @@
+#!/usr/bin/env -S deno run -A
+
+const targets = [
+  { os: "linux", goarch: "amd64", zigarch: "x86_64-linux-gnu" },
+  { os: "linux", goarch: "arm64", zigarch: "aarch64-linux-gnu" },
+  { os: "windows", goarch: "amd64", zigarch: "x86_64-windows-gnu" },
+  { os: "windows", goarch: "arm64", zigarch: "aarch64-windows-gnu" },
+  // TODO: Fix macos build error
+  // error: unable to find dynamic system library 'resolv' using strategy 'paths_first'. searched paths: none
+  // { os: "darwin", goarch: "amd64", zigarch: "x86_64-macos" },
+  // { os: "darwin", goarch: "arm64", zigarch: "aarch64-macos" },
+];
+
+const cmds = [
+  "nsqlited",
+  "nsqlite",
+];
+
+const buildsQty = targets.length * cmds.length;
+let buildsCount = 0;
+
+for await (const target of targets) {
+  const env = {
+    CGO_ENABLED: "1",
+    GOOS: target.os,
+    GOARCH: target.goarch,
+    CC: `zig cc -target ${target.zigarch}`,
+    CXX: `zig c++ -target ${target.zigarch}`,
+  };
+
+  for await (const cmd of cmds) {
+    const srcPath = `./cmd/${cmd}/.`;
+    let destPath = `./dist/${target.os}-${target.goarch}/${cmd}`;
+    if (target.os === "windows") destPath += ".exe";
+
+    buildsCount++;
+    print(`${buildsCount}/${buildsQty} Building ${destPath}`);
+
+    const args = [
+      "build",
+      "-o",
+      destPath,
+      srcPath,
+    ];
+
+    const c = new Deno.Command("go", { args, env });
+    const { success, stderr } = await c.output();
+    if (!success) {
+      print("\n");
+      console.error(new TextDecoder().decode(stderr));
+      Deno.exit(1);
+    }
+
+    print(" -> OK\n");
+  }
+}
+
+async function print(text: string) {
+  await Deno.stdout.write(new TextEncoder().encode(text));
+}
