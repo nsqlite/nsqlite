@@ -4,32 +4,42 @@ version: "3"
 
 tasks:
   build:
-    desc: Build the binaries for all platforms
+    desc: Build the distributable binaries for all platforms
     cmd: chmod +x ./build.ts && ./build.ts
 
   install:
-    desc: Build and install binaries in local system using go install
+    desc: Build and install binaries locally for development
     cmds:
       - go install ./cmd/nsqlite/.
       - go install ./cmd/nsqlited/.
+      - go install ./cmd/nsqlitebench/.
 
-  runc:
-    desc: Build an run NSQLite CLI
-    deps: [buildc]
+  run:cli:
+    desc: Build and run NSQLite CLI locally
+    deps: [build:cli]
     cmd: ./dist/nsqlite {{.CLI_ARGS}}
 
-  buildc:
-    desc: Build NSQLite CLI
+  build:cli:
+    desc: Build NSQLite CLI locally
     cmd: go build -o ./dist/nsqlite ./cmd/nsqlite/.
 
-  runs:
-    desc: Build and run NSQLite Server
-    deps: [builds]
+  run:server:
+    desc: Build and run NSQLite Server locally
+    deps: [build:server]
     cmd: ./dist/nsqlited {{.CLI_ARGS}}
 
-  builds:
-    desc: Build NSQLite Server
+  build:server:
+    desc: Build NSQLite Server locally
     cmd: go build -o ./dist/nsqlited ./cmd/nsqlited/.
+
+  run:bench:
+    desc: Build and run NSQLite Benchmark locally
+    deps: [build:bench]
+    cmd: ./dist/nsqlitebench {{.CLI_ARGS}}
+
+  build:bench:
+    desc: Build NSQLite Benchmark locally
+    cmd: go build -o ./dist/nsqlitebench ./cmd/nsqlitebench/.
 
   lint:
     desc: Run linter

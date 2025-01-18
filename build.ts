@@ -12,8 +12,9 @@ const targets = [
 ];
 
 const cmds = [
-  "nsqlited",
   "nsqlite",
+  "nsqlited",
+  "nsqlitebench",
 ];
 
 const buildsQty = targets.length * cmds.length;
