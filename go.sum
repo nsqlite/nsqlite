@@ -29,8 +29,6 @@ github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6T
 github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e h1:fD57ERR4JtEqsWbfPhv4DMiApHyliiK5xCTNVSPiaAs=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nsqlite/nsqlitego v0.1.9 h1:pT7K6dZImINkYtvV7AmE/vxJ/RKNbecHj7bVNyVmVYU=
-github.com/nsqlite/nsqlitego v0.1.9/go.mod h1:p9QuKXGh0PYTNJQjopetGbbAMvZEmbEhdUZAWEB7fUQ=
 github.com/nsqlite/nsqlitego v0.1.10 h1:NVFJa4+jNr22+5qfl/iLSsvOAU84tw1keO+VXw+0uMs=
 github.com/nsqlite/nsqlitego v0.1.10/go.mod h1:p9QuKXGh0PYTNJQjopetGbbAMvZEmbEhdUZAWEB7fUQ=
 github.com/orsinium-labs/enum v1.4.0 h1:3NInlfV76kuAg0kq2FFUondmg3WO7gMEgrPPrlzLDUM=
