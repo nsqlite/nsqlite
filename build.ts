@@ -53,6 +53,11 @@ for await (const target of targets) {
 
     print(" -> OK\n");
   }
+
+  const srcPath = `./dist/${target.os}-${target.goarch}/*`;
+  const zipPath = `./dist/${target.os}-${target.goarch}.zip`;
+  const zip = new Deno.Command("7z", { args: ["a", zipPath, srcPath] });
+  await zip.output();
 }
 
 async function print(text: string) {
