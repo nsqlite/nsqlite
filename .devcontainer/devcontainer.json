@@ -1,9 +1,9 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/debian
 {
-	"name": "NSQLite CLI & Server",
-	"image": "ghcr.io/nsqlite/nsqlitedc:latest",
-	"appPort": [
-		"9876:9876"
-	]
+  "name": "NSQLite CLI & Server",
+  "image": "ghcr.io/nsqlite/nsqlitedc:latest",
+  "appPort": [
+    "9876:9876"
+  ]
 }
