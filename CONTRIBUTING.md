@@ -37,6 +37,7 @@ To maintain consistency and readability across the project, follow these rules:
 - Write idiomatic Go code by following the
   [Effective Go guidelines](https://golang.org/doc/effective_go.html).
 - Use tools like `gofmt` to ensure your code meets Go standards.
+- You can run `task fmt` to format and `task lint` to lint the code.
 
 ### 2. Naming Conventions
 
@@ -50,7 +51,7 @@ To maintain consistency and readability across the project, follow these rules:
 
 ### 3. Code Formatting
 
-- Run `gofmt` before committing your code to ensure consistent formatting.
+- Run `task fmt` to format the code before committing.
 - Keep functions and files small and focused on a single responsibility.
 - Write clean, self-explanatory code to minimize the need for comments.
 
