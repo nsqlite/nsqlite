@@ -12,10 +12,8 @@ tasks:
       - go install ./cmd/nsqlited/.
 
   build:
-    desc: Build all the binaries
-    cmds:
-      - task buildc
-      - task builds
+    desc: Build the binaries for all platforms
+    cmd: chmod +x ./build.sh && ./build.sh
 
   runc:
     desc: Build an run NSQLite CLI
