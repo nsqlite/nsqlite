@@ -41,10 +41,19 @@ tasks:
     desc: Build NSQLite Benchmark locally
     cmd: go build -o ./dist/nsqlitebench ./cmd/nsqlitebench/.
 
+  fmt:
+    desc: Format the Go, Js and Ts code
+    cmds:
+      - go fmt ./...
+      - deno fmt ./
+
   lint:
-    desc: Run linter
-    cmd: golangci-lint run ./...
+    desc: Run linter for Go, Js and Ts code
+    cmds:
+      - golangci-lint run ./...
+      - deno lint ./
 
   test:
-    desc: Run tests
-    cmd: go test ./...
+    desc: Run tests for Go
+    cmds:
+      - go test ./...
