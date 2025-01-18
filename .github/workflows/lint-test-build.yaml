@@ -1,4 +1,4 @@
-name: Lint and Test
+name: Lint, test and build
 on:
   pull_request:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint-and-test:
-    name: Lint and test the code
+    name: Lint, test and build the code
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
