@@ -229,4 +229,61 @@ func TestSQLiteC(t *testing.T) {
 		assert.Len(t, sel.Rows, 1)
 		assert.Equal(t, largeData, sel.Rows[0][0])
 	})
+
+	t.Run("Transactions", func(t *testing.T) {
+		conn, err := Open(":memory:")
+		assert.NoError(t, err)
+		defer conn.Close()
+
+		recreateTable := func() {
+			_, err = conn.Query("DROP TABLE IF EXISTS test", nil)
+			assert.NoError(t, err)
+			_, err = conn.Query("CREATE TABLE test (id INTEGER PRIMARY KEY, val TEXT)", nil)
+			assert.NoError(t, err)
+		}
+
+		t.Run("Successful", func(t *testing.T) {
+			recreateTable()
+
+			_, err := conn.Query("BEGIN TRANSACTION", nil)
+			assert.NoError(t, err)
+
+			for range 20 {
+				_, err = conn.Query(
+					"INSERT INTO test (val) VALUES (?)",
+					[]QueryParam{{Value: uuid.NewString()}},
+				)
+				assert.NoError(t, err)
+			}
+
+			_, err = conn.Query("COMMIT", nil)
+			assert.NoError(t, err)
+
+			sel, err := conn.Query("SELECT val FROM test", nil)
+			assert.NoError(t, err)
+			assert.Len(t, sel.Rows, 20)
+		})
+
+		t.Run("Rollback", func(t *testing.T) {
+			recreateTable()
+
+			_, err := conn.Query("BEGIN TRANSACTION", nil)
+			assert.NoError(t, err)
+
+			for range 20 {
+				_, err = conn.Query(
+					"INSERT INTO test (val) VALUES (?)",
+					[]QueryParam{{Value: uuid.NewString()}},
+				)
+				assert.NoError(t, err)
+			}
+
+			_, err = conn.Query("ROLLBACK", nil)
+			assert.NoError(t, err)
+
+			sel, err := conn.Query("SELECT val FROM test", nil)
+			assert.NoError(t, err)
+			assert.Len(t, sel.Rows, 0)
+		})
+	})
 }
