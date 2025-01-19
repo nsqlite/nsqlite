@@ -213,8 +213,6 @@ func (r *Repl) prompt() string {
 	if file, err := os.Open(r.historyPath); err == nil {
 		_, _ = line.ReadHistory(file)
 		file.Close()
-	} else {
-		fmt.Println("No previous history.", err)
 	}
 
 	prompt, err := line.Prompt(label)
